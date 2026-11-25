@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Shrinkage Counter — wrong build #2, kept for study</title>
+<style>body{background:#F8F5EE;color:#26221E;font:15px/1.55 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif;max-width:860px;margin:0 auto;padding:28px 18px 60px}
+h1{font-size:22px} .warn{background:#A4312A;color:#fff;font-weight:700;padding:10px 14px;border-radius:9px;margin:14px 0}
+pre{white-space:pre-wrap;font:12.5px/1.5 Menlo,Consolas,monospace;background:#fff;border:1px solid #DCD5C8;border-radius:9px;padding:12px}
+a{color:#7C3A2A}</style></head><body>
+<h1>The Shrinkage Counter — wrong build #2</h1>
+<div class="warn">THIS VERSION IS WRONG ON PURPOSE. It is the episode's build #2, preserved so you can study the bug. Per-product ledgers, but no count window, no duplicate hold, write-offs billed twice, and products it never counted invented on the fly. The honest tool is <a href="index.html">index.html</a>; the bugs are annotated in the comments of this page's source.</div>
+<p>Its verdict on the same sample store the honest tool audits:</p>
+<pre id="o">running…</pre>
+<script>// The Shrinkage Counter — SECOND BUILD (after prompt 2), kept verbatim for the episode.
+// Prompt 2 fixed the netting: every SKU now keeps its own ledger. What the independent checker
+// later caught, still in here exactly as built:
+//   * no count window: the drill delivery that arrived THE DAY AFTER the second count is added
+//     to expected stock, so the page accuses the shop of losing sixteen drills instead of six;
+//   * no duplicate-reference check: the screws delivery keyed in twice doubles expected stock,
+//     and ten boxes that never existed join the missing list;
+//   * a movement whose SKU is not on the count sheet gets a brand-new ledger starting at zero,
+//     and with no second count its "expected" goes negative — so the page reports a SURPLUS of
+//     eighteen units of a product it never counted;
+//   * recorded write-offs are subtracted from expected AND listed again under "stolen or lost",
+//     so the six cans of stain the shop wrote off honestly are billed as theft on top;
+//   * floats and toFixed everywhere.
+(function (root) {
+  "use strict";
+  function rows(text) { return text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split(",")); }
+  function num(s) { const v = parseFloat(String(s || "").replace(/[$,]/g, "")); return isNaN(v) ? null : v; }
+
+  function audit(countsCsv, movesCsv) {
+    const c = rows(countsCsv), m = rows(movesCsv);
+    const chh = c[0].map(s => s.trim().toLowerCase());
+    const mh = m[0].map(s => s.trim().toLowerCase());
+    const ci = n => chh.indexOf(n), mi = n => mh.indexOf(n);
+    const led = {};   // sku -> {item, cost, first, second, net, writeoff}
+    for (let r = 1; r < c.length; r++) {
+      const sku = (c[r][ci("sku")] || "").trim();
+      const f = num(c[r][ci("first count")]), s2 = num(c[r][ci("second count")]);
+      if (!sku || f === null || s2 === null) continue;    // still silently skipped
+      led[sku] = { sku, item: (c[r][ci("item")] || "").trim(), cost: num(c[r][ci("unit cost")]) || 0,
+        first: f, second: s2, net: 0, writeoff: 0 };      // a duplicate row quietly overwrites
+    }
+    for (let r = 1; r < m.length; r++) {
+      const sku = (m[r][mi("sku")] || "").trim();
+      const t = (m[r][mi("type")] || "").trim().toLowerCase();
+      const q = num(m[r][mi("qty")]);
+      if (!sku || q === null) continue;
+      if (!led[sku]) led[sku] = { sku, item: "(from movements)", cost: 0, first: 0, second: 0, net: 0, writeoff: 0 };
+      if (t === "sale") led[sku].net -= q;
+      else if (t === "writeoff") { led[sku].net -= q; led[sku].writeoff += q; }
+      else led[sku].net += q;                             // received, return, unknown types too
+    }
+    const lost = [], surplus = [];
+    let lostValue = 0, surplusUnits = 0;
+    for (const k of Object.keys(led)) {
+      const L = led[k];
+      const expected = L.first + L.net;
+      const v = L.second - expected;
+      const stolenOrLost = Math.max(0, -v) + L.writeoff;  // the double-dip
+      if (stolenOrLost > 0) {
+        lost.push({ sku: L.sku, item: L.item, units: stolenOrLost, value: +(stolenOrLost * L.cost).toFixed(2) });
+        lostValue += stolenOrLost * L.cost;
+      } else if (v > 0) {
+        surplus.push({ sku: L.sku, item: L.item, units: v });
+        surplusUnits += v;
+      }
+    }
+    lost.sort((a, b) => b.value - a.value);
+    return { lost, surplus, lostValue: +lostValue.toFixed(2), surplusUnits,
+      verdict: "Stolen or lost: $" + lostValue.toFixed(2) + " across " + lost.length + " products." };
+  }
+  root.SC_V2 = { audit };
+})(typeof window !== "undefined" ? window : (typeof module !== "undefined" ? module.exports : this));
+</script>
+<script>
+const C = "SKU,Item,Unit Cost,First Count,First Date,Second Count,Second Date\nEL-0144,Outlet & switch combo pack,14.20,26,2026-08-31,14,2026-11-22\nEL-0215,LED work light - rechargeable,34.00,10,2026-08-31,5,2026-11-22\nEL-0388,Outlet tester,12.50,8,2026-08-31,7,2026-11-22\nEL-0509,Extension cord - 50 ft,27.60,18,2026-08-31,6,2026-11-22\nEL-0612,Smoke alarm - 10 yr battery,18.40,22,2026-08-31,13,2026-11-22\nFA-0105,Deck screws - 5 lb box,26.50,18,2026-08-31,9,2026-11-22\nFA-0220,Finish nails - 1 lb box,4.80,25,2026-08-31,20,2026-11-22\nFA-0512,Wood screws - 5 lb box,24.00,16,2026-08-31,12,2026-11-22\nGD-0330,Garden hose - 75 ft,23.90,14,2026-08-31,14,2026-11-22\nGD-0518,Pruning shears - bypass,16.70,12,2026-08-31,14,2026-11-22\nHW-0102,Claw hammer - 16 oz,11.40,20,2026-08-31,7,2026-11-22\nHW-0231,Tape measure - 25 ft,9.75,18,2026-08-31,15,2026-11-22\nHW-0310,Screwdriver set - 12 pc,19.90,12,2026-08-31,16,2026-11-22\nHW-0477,Adjustable wrench - 10 in,13.60,14,2026-08-31,14,2026-11-22\nHW-0655,Utility knife,8.90,15,2026-08-31,13,2026-11-22\nHW-0788,Keyless entry door lock,62.00,9,2026-08-31,3,2026-11-22\nHW-0821,Padlock - weatherproof,15.25,16,2026-08-31,24,2026-11-22\nHW-1104,18V cordless drill kit,89.00,14,2026-08-31,6,2026-11-22\nPL-0120,PVC cement - 8 oz,6.90,24,2026-08-31,12,2026-11-22\nPL-0233,Kitchen faucet - single handle,74.00,7,2026-08-31,4,2026-11-22\nPL-0389,Toilet repair kit,21.50,13,2026-08-31,16,2026-11-22\nPL-0466,Brass pipe-fitting assortment pack,28.40,12,2026-08-31,9,2026-11-22\nPT-0101,Interior semi-gloss - gallon,18.75,35,2026-08-31,46,2026-11-22\nPT-0144,Painter's tape - 1.88 in,6.20,30,2026-08-31,20,2026-11-22\nPT-0188,Roller cover 3-pack,7.40,40,2026-08-31,18,2026-11-22\nPT-0255,Deck stain - gallon cedar,21.80,22,2026-08-31,8,2026-11-22\nPT-0290,Paint brush set - 5 pc,9.95,28,2026-08-31,16,2026-11-22\nPT-0312,Interior eggshell paint - gallon white,16.50,40,2026-08-31,30,2026-11-22\nPT-0366,Drop cloth - canvas 9x12,17.80,15,2026-08-31,22,2026-11-22\nSP-0444,Wet/dry vacuum - 6 gal,79.00,6,2026-08-31,24,2026-11-22\nSP-0633,Tankless water heater,439.00,5,2026-08-31,3,2026-11-22\nSP-0710,Portable generator - 2200W,549.00,4,2026-08-31,4,2026-11-22\nSP-0901,Airless paint sprayer,189.00,4,2026-08-31,1,2026-11-22\nHW-0231,Tape measure - 25 ft (recount?),9.75,18,2026-08-31,17,2026-11-22\nPT-0401,Primer - quart,8.60,11,2026-08-31,?,2026-11-22\nGL-0117,Window glass pane - custom cut,market,6,2026-08-31,6,2026-11-22\n";
+const M = "Date,Type,SKU,Qty,Ref\n2026-08-30,sale,PT-0312,1,S-0830\n2026-09-02,sale,HW-1104,1,S-5001\n2026-09-02,sale,EL-0612,2,S-5002\n2026-09-02,sale,FA-0105,8,S-5003\n2026-09-03,sale,PT-0312,9,S-5004\n2026-09-03,received,FA-0220,10,R-5005\n2026-09-03,received,HW-0821,20,R-5006\n2026-09-04,sale,SP-0901,1,S-5007\n2026-09-04,sale,PT-0255,1,S-5008\n2026-09-05,sale,EL-0215,2,S-5009\n2026-09-05,received,SP-0444,26,R-5010\n2026-09-07,sale,SP-0901,1,S-5011\n2026-09-07,sale,PT-0255,1,S-5012\n2026-09-07,received,HW-0655,13,R-5013\n2026-09-08,sale,FA-0512,6,S-5014\n2026-09-09,received,PT-0312,20,R-0920\n2026-09-09,sale,HW-0231,6,S-5015\n2026-09-09,sale,PT-0188,3,S-5016\n2026-09-10,received,FA-0512,10,R-2214\n2026-09-10,received,FA-0512,10,R-2214\n2026-09-10,sale,PT-0144,4,S-5017\n2026-09-10,received,EL-0388,10,R-5018\n2026-09-10,sale,PL-0389,3,S-5019\n2026-09-10,received,FA-0105,5,R-5020\n2026-09-11,sale,HW-0788,3,S-5021\n2026-09-11,received,PT-0255,12,R-1112\n2026-09-12,sale,PT-0312,2,S-5022\n2026-09-12,sale,PL-0120,17,S-5023\n2026-09-12,sale,SP-0444,1,S-5024\n2026-09-13,received,PL-0466,10,R-1310\n2026-09-13,received,PT-0101,16,R-5025\n2026-09-14,sale,PT-0312,6,S-5026\n2026-09-14,sale,PT-0188,4,S-5027\n2026-09-16,sale,HW-1104,4,S-5028\n2026-09-16,sale,GD-0914,7,S-ORF1\n2026-09-17,sale,PL-0466,1,S-5029\n2026-09-17,received,HW-0231,8,R-5030\n2026-09-17,sale,HW-0310,1,S-5031\n2026-09-17,sale,PT-0188,18,S-5032\n2026-09-17,received,EL-0612,15,R-5033\n2026-09-17,sale,GD-0330,3,S-5034\n2026-09-18,received,HW-1104,12,R-1808\n2026-09-18,sale,PT-0312,3,S-5035\n2026-09-19,sale,PT-0188,7,S-5036\n2026-09-20,sale,HW-1104,1,S-5037\n2026-09-20,received,PT-0144,13,R-5038\n2026-09-21,received,EL-0215,8,R-2108\n2026-09-22,sale,PL-0233,1,S-5039\n2026-09-23,sale,PL-0120,3,S-5040\n2026-09-24,sale,PL-0466,1,S-5041\n2026-09-25,received,HW-0788,6,R-2506\n2026-09-25,sale,PT-0144,4,S-5042\n2026-09-27,received,HW-0310,28,R-5043\n2026-09-28,sale,PT-0188,10,S-5044\n2026-09-28,sale,EL-0612,11,S-5045\n2026-09-30,return,PT-0312,2,T-3002\n2026-09-30,sale,PT-0101,2,S-5046\n2026-09-31,sale,PT-0144,2,S-0931\n2026-10-01,sale,EL-0215,1,S-5047\n2026-10-01,sale,FA-0105,1,S-5048\n2026-10-02,sale,PT-0255,4,S-5049\n2026-10-03,received,SP-0901,2,R-3302\n2026-10-03,received,PL-0120,17,R-5050\n2026-10-03,return,PL-0389,1,T-5051\n2026-10-04,sale,PT-0255,2,S-5052\n2026-10-04,sale,EL-0509,7,S-5053\n2026-10-05,sale,PT-0290,9,S-5054\n2026-10-06,sale,FA-0512,1,S-5055\n2026-10-06,received,GD-0518,7,R-5056\n2026-10-07,sale,HW-0655,2 boxes,S-37BX\n2026-10-07,sale,HW-0477,5,S-5057\n2026-10-07,sale,PL-0120,5,S-5058\n2026-10-07,sale,PL-0389,5,S-5059\n2026-10-10,sale,PT-0312,3,S-5060\n2026-10-10,sale,FA-0512,4,S-5061\n2026-10-11,return,HW-1104,1,T-4101\n2026-10-11,sale,HW-0655,11,S-5062\n2026-10-11,sale,PL-0389,8,S-5063\n2026-10-12,sale,PT-0312,4,S-5064\n2026-10-12,sale,PT-0144,1,S-5065\n2026-10-12,sale,SP-0710,2,S-5066\n2026-10-13,sale,EL-0215,1,S-5067\n2026-10-13,received,SP-0710,5,R-5068\n2026-10-14,sale,GD-0914,6,S-ORF2\n2026-10-14,sale,SP-0633,1,S-5069\n2026-10-15,sale,HW-1104,1,S-5070\n2026-10-15,sale,HW-0102,13,S-5071\n2026-10-15,sale,PT-0366,1,S-5072\n2026-10-16,sale,PT-0312,6,S-5073\n2026-10-16,writeoff,PT-0255,6,W-4606\n2026-10-17,sale,EL-0215,5,S-5074\n2026-10-18,return,HW-0102,1,T-5075\n2026-10-18,sale,GD-0330,3,S-5076\n2026-10-19,sale,PT-0188,1,\n2026-10-19,sale,HW-0310,3,S-5077\n2026-10-19,sale,EL-0144,9,S-5078\n2026-10-20,sale,SP-0710,3,S-5079\n2026-10-21,sale,HW-0788,2,S-5080\n2026-10-21,received,PT-0188,27,R-5081\n2026-10-22,received,PT-0312,16,R-5216\n2026-10-23,sale,PT-0144,5,S-5082\n2026-10-23,sale,HW-0102,1,S-5083\n2026-10-23,received,HW-0477,25,R-5084\n2026-10-23,sale,EL-0612,4,S-5085\n2026-10-24,sale,SP-0901,1,S-5086\n2026-10-24,sale,PT-0366,8,S-5087\n2026-10-24,sale,EL-0509,5,S-5088\n2026-10-25,received,GD-0330,6,R-5089\n2026-10-25,sale,SP-0444,7,S-5090\n2026-10-26,return,HW-0477,1,T-5091\n2026-10-26,received,PT-0366,16,R-5092\n2026-10-26,sale,PL-0389,10,S-5093\n2026-10-27,sale,PT-0255,9,S-5094\n2026-10-27,sale,FA-0105,6,S-5095\n2026-10-28,sale,EL-0388,-3,S-58NG\n2026-10-28,sale,HW-0655,2,S-5096\n2026-10-28,sale,PL-0120,2,S-5097\n2026-10-29,sale,HW-0310,2,S-5098\n2026-10-30,sale,HW-0788,2,S-5099\n2026-10-30,sale,EL-0215,2,S-5100\n2026-10-30,sale,FA-0220,5,S-5101\n2026-10-30,received,PL-0389,30,R-5102\n2026-10-30,sale,GD-0518,4,S-5103\n2026-11-01,sale,PT-0312,1,S-5104\n2026-11-01,sale,HW-0788,2,S-5105\n2026-11-01,transfer,HW-0231,2,X-6202\n2026-11-01,sale,EL-0388,7,S-5106\n2026-11-05,sale,FA-0512,1,S-5107\n2026-11-05,sale,HW-0310,18,S-5108\n2026-11-05,sale,HW-0477,6,S-5109\n2026-11-06,sale,FA-0220,1,S-5110\n2026-11-06,sale,HW-0477,13,S-5111\n2026-11-06,sale,HW-0821,11,S-5112\n2026-11-06,sale,SP-0633,2,S-5113\n2026-11-07,sale,PT-0188,2,S-5114\n2026-11-07,return,SP-0633,1,T-5115\n2026-11-07,return,FA-0105,1,T-5116\n2026-11-08,sale,HW-0477,1,S-5117\n2026-11-08,sale,HW-0821,1,S-5118\n2026-11-09,sale,PL-0466,5,S-5119\n2026-11-10,sale,GD-0914,5,S-ORF3\n2026-11-10,sale,PT-0144,8,S-5120\n2026-11-10,sale,FA-0220,8,S-5121\n2026-11-10,sale,PT-0188,5,S-5122\n2026-11-11,sale,PT-0255,1,S-5123\n2026-11-11,sale,EL-0388,2,S-5124\n2026-11-11,sale,PL-0389,2,S-5125\n2026-11-12,sale,FA-0512,2,S-5126\n2026-11-12,sale,EL-0388,3,S-5127\n2026-11-13,sale,HW-1104,2,S-5128\n2026-11-13,sale,PT-0101,3,S-5129\n2026-11-13,sale,PL-0120,2,S-5130\n2026-11-14,sale,HW-0231,4,S-5131\n2026-11-14,sale,HW-0655,1,S-5132\n2026-11-15,return,EL-0612,1,T-5133\n2026-11-16,sale,EL-0612,3,S-5134\n2026-11-17,sale,PT-0312,18,S-5135\n2026-11-18,sale,PL-0466,1,S-5136\n2026-11-18,sale,HW-0477,1,S-5137\n2026-11-18,sale,EL-0144,3,S-5138\n2026-11-18,sale,GD-0518,1,S-5139\n2026-11-19,sale,PT-0290,3,S-5140\n2026-11-20,sale,PL-0233,2,S-5141\n2026-11-21,sale,HW-1104,6,S-5142\n2026-11-22,sale,EL-0612,5,S-5143\n2026-11-23,received,HW-1104,10,R-9923\n";
+const R = (function(){const r=SC_V2.audit(C,M);
+let s="PER-PRODUCT, BUT NO RULES:\n\n\"stolen or lost\" list:\n";
+for(const l of r.lost) s+="  "+l.sku+"  "+l.item+"  "+l.units+" units  $"+l.value.toFixed(2)+"\n";
+s+="\nsurpluses it celebrated:\n";
+for(const x of r.surplus) s+="  "+x.sku+"  "+x.item+"  +"+x.units+" units\n";
+s+="\nVERDICT: "+r.verdict
+ +"\n\nWhat's wrong in that list: sixteen drill kits (a post-count delivery folded in), ten\nscrew boxes (one delivery counted twice), stain written off honestly then billed as theft,\nand an 18-unit surplus of a product that was never on the count sheet at all.";return s;})();
+document.getElementById("o").textContent = R;
+</script></body></html>

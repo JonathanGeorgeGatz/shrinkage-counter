@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Shrinkage Counter</title>
+<style>
+:root{--ink:#26221E;--dim:#6E675E;--line:#DCD5C8;--paper:#F8F5EE;--panel:#FFFFFF;--acc:#7C3A2A;--sig:#44617A;--warn:#A4312A;--ok:#2F6B4F;
+--mono:"SF Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);padding:26px 30px 60px}
+h1{font-size:26px;letter-spacing:-.01em}
+h1 small{font-size:14px;color:var(--dim);font-weight:400;margin-left:10px}
+.sub{color:var(--dim);font-size:14px;margin:4px 0 16px}
+#banner,#missban{display:none;color:#fff;font-weight:800;font-size:19px;padding:12px 18px;border-radius:10px;margin:0 0 16px}
+#banner{background:var(--warn)} #missban{background:var(--acc)}
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+textarea{width:100%;height:120px;font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:var(--ink)}
+label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:5px}
+.bar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.bar .f{display:flex;flex-direction:column;gap:5px}
+select{font:15px var(--sans);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:230px}
+button{font:15px/1 var(--sans);font-weight:700;padding:11px 20px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.note{font-size:13px;color:var(--dim)}
+#fict{display:none;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--sig);border:1px solid var(--sig);border-radius:7px;padding:4px 10px}
+#tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:6px 0 20px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.tile .v{font-size:29px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;padding:2px 0}
+.tile .s{font-size:12px;color:var(--dim);margin-top:3px}
+.tile.acc .v{color:var(--acc)} .tile.warn .v{color:var(--warn)} .tile.sig .v{color:var(--sig)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+section h2{font-size:17px;margin-bottom:4px}
+section .why{font-size:13px;color:var(--dim);margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:left;padding:5px 8px;border-bottom:2px solid var(--line)}
+td{padding:6px 8px;border-top:1px solid #EFEAE0;font-variant-numeric:tabular-nums;vertical-align:top}
+td.n,th.n{text-align:right}
+.chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.05em;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:1px}
+.chip.miss{color:#fff;background:var(--warn)}
+.chip.plus{color:#fff;background:var(--sig)}
+.chip.forg{color:var(--dim);background:#EFEAE0}
+.chip.off{color:#fff;background:var(--ok)}
+.delta.up{color:var(--warn);font-weight:700}.delta.dn{color:var(--ok);font-weight:700}
+#recon{font:13.5px/1.7 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+#recon .ok{color:var(--ok);font-weight:700} #recon .bad{color:var(--warn);font-weight:700}
+footer{margin-top:24px;font-size:12.5px;color:var(--dim)}
+@media (max-width:900px){#tiles{grid-template-columns:repeat(2,1fr)}.wrap{grid-template-columns:1fr}}
+</style></head><body>
+<h1>The Shrinkage Counter <small>every unit accounts for itself, or gets named</small></h1>
+<div class="sub">Everything runs in this page. Nothing you paste leaves your machine. <span id="fict">fictional sample data</span></div>
+<div id="banner"></div>
+<div id="missban"></div>
+<div class="wrap">
+  <div><label>the count sheet (CSV: SKU, Item, Unit Cost, First Count, First Date, Second Count, Second Date)</label><textarea id="ccsv" spellcheck="false"></textarea></div>
+  <div><label>the movements between the counts (CSV: Date, Type, SKU, Qty, Ref — types: sale, received, return, writeoff)</label><textarea id="mcsv" spellcheck="false"></textarea></div>
+</div>
+<div class="bar">
+  <button id="sample">Load the sample store</button>
+  <button id="go" class="primary">Count what's missing</button>
+  <div class="f"><label for="s_forgive">count noise to forgive</label><select id="s_forgive"><option value="0">none — every unit answers</option><option value="1" selected>1 unit per product</option><option value="2">2 units per product</option></select></div>
+  <div class="f"><label for="s_spot">spotlight: unit cost at least</label><select id="s_spot"><option value="2500">$25</option><option value="5000" selected>$50</option><option value="10000">$100</option></select></div>
+  <div class="f"><label for="s_lens">loss lens</label><select id="s_lens"><option value="unexplained" selected>unexplained only</option><option value="all">include recorded write-offs</option></select></div>
+  <button id="dl">Download the verdicts (CSV)</button>
+</div>
+<div id="out" style="display:none">
+<div id="tiles">
+  <div class="tile warn"><div class="k" id="t_head_k">Missing, unexplained</div><div class="v" id="t_head">—</div><div class="s" id="t_head_s"></div></div>
+  <div class="tile acc"><div class="k">Share of what the shelves held</div><div class="v" id="t_pct">—</div><div class="s" id="t_pct_s"></div></div>
+  <div class="tile sig"><div class="k">Appeared from nowhere</div><div class="v" id="t_plus">—</div><div class="s" id="t_plus_s"></div></div>
+  <div class="tile"><div class="k">Recorded write-offs</div><div class="v" id="t_off">—</div><div class="s" id="t_off_s"></div></div>
+</div>
+<section><h2>Worth walking out with</h2>
+<div class="why" id="spotwhy"></div>
+<table><thead><tr><th>SKU</th><th>Item</th><th class="n">Unit cost</th><th class="n">Units missing</th><th class="n">Value</th></tr></thead><tbody id="spotT"></tbody></table></section>
+<section><h2>Every product with a verdict</h2>
+<div class="why" id="skuswhy"></div>
+<table><thead><tr><th>SKU</th><th>Item</th><th class="n">First</th><th class="n">+In</th><th class="n">−Out</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Variance</th><th class="n">Value</th></tr></thead><tbody id="skuT"></tbody></table></section>
+<section><h2>Sold but never counted</h2>
+<div class="why">Movements pointing at a product with no usable count row. The ledger knows this product; the count sheet doesn't. Count it, or stop selling ghosts.</div>
+<table><thead><tr><th>SKU</th><th class="n">Rows</th><th class="n">Units moved</th></tr></thead><tbody id="orphT"></tbody></table></section>
+<section><h2>Rows this page refused or held, with reasons</h2>
+<div class="why">A row that can't be trusted is refused and listed — never silently swallowed. A reference seen twice is held so a delivery can't count double.</div>
+<table><thead><tr><th>File</th><th class="n">Row</th><th>Id / ref</th><th>Reason</th></tr></thead><tbody id="refT"></tbody></table></section>
+<div id="recon"></div>
+</div>
+<footer>The Shrinkage Counter · built on "Build It With AI" · one file, no internet, no account. Sample store (Wrenfield Hardware &amp; Paint) is fictional.</footer>
+<script>// The Shrinkage Counter — final engine (Episode 41). All money in integer cents; all units in
+// integer units; every division through halfUpDiv so two implementations cannot drift.
+// window.SC.audit(countsCsv, movementsCsv, settings) -> report object.
+(function (root) {
+  "use strict";
+  const DEF = { forgiveUnits: 1, spotlightCents: 5000, lens: "unexplained" };
+
+  function splitCsv(text) {
+    const rows = [];
+    let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+      else if (ch !== "\r") cell += ch;
+    }
+    if (cell.length || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(r => r.length > 1 || (r[0] || "").trim() !== "");
+  }
+
+  const halfUpDiv = (a, b) => Math.floor((2 * a + b) / (2 * b));
+  const pctTenths = (part, base) => base > 0 ? halfUpDiv(part * 1000, base) : 0;
+
+  function cents(s) {
+    const m = /^\s*\$?\s*([0-9][0-9,]*)(?:\.([0-9]{1,2}))?\s*$/.exec(s || "");
+    if (!m) return null;
+    const frac = m[2] ? (m[2].length === 1 ? +m[2] * 10 : +m[2]) : 0;
+    return parseInt(m[1].replace(/,/g, ""), 10) * 100 + frac;
+  }
+  function units(s) {   // integer units: digits and commas only, no decimals, no sign
+    const m = /^\s*([0-9][0-9,]*)\s*$/.exec(s || "");
+    if (!m) return null;
+    return parseInt(m[1].replace(/,/g, ""), 10);
+  }
+  const MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function validDate(s) {  // YYYY-MM-DD and the date must exist
+    const m = /^\s*([0-9]{4})-([0-9]{2})-([0-9]{2})\s*$/.exec(s || "");
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3];
+    if (mo < 1 || mo > 12 || d < 1) return null;
+    let md = MDAYS[mo - 1];
+    if (mo === 2 && ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0)) md = 29;
+    if (d > md) return null;
+    return m[1] + "-" + m[2] + "-" + m[3];
+  }
+  const fmtPctT = t => Math.floor(t / 10) + "." + (t % 10) + "%";
+  const fmtMoney = c => (c < 0 ? "-$" : "$") + Math.abs(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function audit(countsCsv, movesCsv, settings) {
+    const S = Object.assign({}, DEF, settings || {});
+    const cRows = splitCsv(countsCsv), mRows = splitCsv(movesCsv);
+    if (!cRows.length || !mRows.length) throw new Error("Paste both files (or load the sample store).");
+    const chh = cRows[0].map(s => s.trim().toLowerCase());
+    const mh = mRows[0].map(s => s.trim().toLowerCase());
+    const ci = n => chh.indexOf(n), mi = n => mh.indexOf(n);
+    for (const n of ["sku", "item", "unit cost", "first count", "first date", "second count", "second date"])
+      if (ci(n) === -1) throw new Error("The counts file is missing a “" + n + "” column.");
+    for (const n of ["date", "type", "sku", "qty", "ref"])
+      if (mi(n) === -1) throw new Error("The movements file is missing a “" + n + "” column.");
+
+    // ---- counts ----
+    const refusedCounts = [];
+    const skus = new Map();   // sku -> record (kept, insertion order)
+    let countRows = 0;
+    for (let r = 1; r < cRows.length; r++) {
+      const row = cRows[r]; countRows++;
+      const line = r + 1;
+      const g = n => (row[ci(n)] !== undefined ? row[ci(n)] : "").trim();
+      const sku = g("sku");
+      if (!sku) { refusedCounts.push({ line, sku: "(blank)", reason: "no SKU" }); continue; }
+      if (skus.has(sku)) { refusedCounts.push({ line, sku, reason: "duplicate SKU — the first row was kept" }); continue; }
+      const unitCost = cents(g("unit cost"));
+      if (unitCost === null || unitCost < 1) { refusedCounts.push({ line, sku, reason: "no usable unit cost: “" + g("unit cost") + "”" }); continue; }
+      const first = units(g("first count"));
+      if (first === null) { refusedCounts.push({ line, sku, reason: "first count unreadable: “" + g("first count") + "”" }); continue; }
+      const second = units(g("second count"));
+      if (second === null) { refusedCounts.push({ line, sku, reason: "second count unreadable: “" + g("second count") + "”" }); continue; }
+      const d1 = validDate(g("first date"));
+      if (!d1) { refusedCounts.push({ line, sku, reason: "first date is not a real date: “" + g("first date") + "”" }); continue; }
+      const d2 = validDate(g("second date"));
+      if (!d2) { refusedCounts.push({ line, sku, reason: "second date is not a real date: “" + g("second date") + "”" }); continue; }
+      if (!(d2 > d1)) { refusedCounts.push({ line, sku, reason: "the second count is not after the first" }); continue; }
+      skus.set(sku, { sku, item: g("item"), unitCost, first, second, d1, d2,
+        sales: 0, received: 0, returns: 0, writeoffs: 0 });
+    }
+
+    // ---- movements ----
+    const refusedMoves = [], held = [], orphanRows = [];
+    const refOwned = new Set();
+    const applied = [];
+    let movementRows = 0;
+    for (let r = 1; r < mRows.length; r++) {
+      const row = mRows[r]; movementRows++;
+      const line = r + 1;
+      const g = n => (row[mi(n)] !== undefined ? row[mi(n)] : "").trim();
+      const ref = g("ref");
+      const own = () => { if (ref && !refOwned.has(ref)) refOwned.add(ref); };
+      const date = validDate(g("date"));
+      if (!date) { refusedMoves.push({ line, ref: ref || "(blank)", reason: "a date that does not exist: “" + g("date") + "”" }); own(); continue; }
+      const type = g("type").toLowerCase();
+      if (!["sale", "received", "return", "writeoff"].includes(type)) {
+        refusedMoves.push({ line, ref: ref || "(blank)", reason: "a movement type this page does not know: “" + g("type") + "”" }); own(); continue;
+      }
+      const qRaw = g("qty");
+      const qty = units(qRaw);
+      if (qty === null || qty < 1) {
+        const neg = /^\s*-/.test(qRaw);
+        refusedMoves.push({ line, ref: ref || "(blank)", reason: neg
+          ? "negative quantity — a customer return is its own type: “" + qRaw + "”"
+          : "quantity unreadable: “" + qRaw + "”" }); own(); continue;
+      }
+      if (!ref) { refusedMoves.push({ line, ref: "(blank)", reason: "no reference id" }); continue; }
+      if (refOwned.has(ref)) { held.push({ line, ref, reason: "same reference seen twice — the first was kept" }); continue; }
+      refOwned.add(ref);
+      const sku = g("sku");
+      const rec = skus.get(sku);
+      if (!sku || !rec) { orphanRows.push({ line, sku: sku || "(blank)", type, qty, ref }); continue; }
+      if (!(date > rec.d1)) { refusedMoves.push({ line, ref, reason: "dated on or before the first count" }); continue; }
+      if (!(date <= rec.d2)) { refusedMoves.push({ line, ref, reason: "dated after the second count" }); continue; }
+      rec[type === "sale" ? "sales" : type === "received" ? "received" : type === "return" ? "returns" : "writeoffs"] += qty;
+      applied.push({ line, sku, type, qty });
+    }
+
+    // ---- per-SKU verdicts ----
+    const out = [];
+    for (const rec of skus.values()) {
+      const expected = rec.first + rec.received + rec.returns - rec.sales - rec.writeoffs;
+      const variance = rec.second - expected;
+      let cls;
+      if (variance === 0) cls = "CLEAN";
+      else if (Math.abs(variance) <= S.forgiveUnits) cls = "FORGIVEN";
+      else cls = variance < 0 ? "MISSING" : "SURPLUS";
+      out.push({ sku: rec.sku, item: rec.item, unitCost: rec.unitCost, first: rec.first,
+        second: rec.second, sales: rec.sales, received: rec.received, returns: rec.returns,
+        writeoffs: rec.writeoffs, expected, variance, class: cls });
+    }
+    const korder = { MISSING: 0, SURPLUS: 1, FORGIVEN: 2, CLEAN: 3 };
+    out.sort((a, b) => korder[a.class] - korder[b.class]
+      || (a.class === "MISSING" ? (-b.variance * b.unitCost) - (-a.variance * a.unitCost)
+        : a.class === "SURPLUS" ? (b.variance * b.unitCost) - (a.variance * a.unitCost) : 0)
+      || (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
+
+    const by = cls => out.filter(l => l.class === cls);
+    const missing = by("MISSING"), surplus = by("SURPLUS"), forgiven = by("FORGIVEN"), clean = by("CLEAN");
+    const sum = (arr, f) => arr.reduce((s, l) => s + f(l), 0);
+    const availableUnits = sum(out, l => l.first + l.received + l.returns);
+    const availableValue = sum(out, l => (l.first + l.received + l.returns) * l.unitCost);
+    const missingUnits = sum(missing, l => -l.variance);
+    const missingValue = sum(missing, l => -l.variance * l.unitCost);
+    const surplusUnits = sum(surplus, l => l.variance);
+    const surplusValue = sum(surplus, l => l.variance * l.unitCost);
+    const forgivenUnits = sum(forgiven, l => Math.abs(l.variance));
+    const forgivenValue = sum(forgiven, l => Math.abs(l.variance) * l.unitCost);
+    const recordedLossUnits = sum(out, l => l.writeoffs);
+    const recordedLossValue = sum(out, l => l.writeoffs * l.unitCost);
+    const soldUnits = sum(out, l => l.sales);
+    const headlineValue = S.lens === "all" ? missingValue + recordedLossValue : missingValue;
+    const shrinkPct_tenths = pctTenths(missingValue, availableValue);
+
+    // orphans grouped by distinct SKU
+    const om = new Map();
+    for (const o of orphanRows) {
+      if (!om.has(o.sku)) om.set(o.sku, { sku: o.sku, rows: 0, units: 0, firstLine: o.line });
+      const e = om.get(o.sku); e.rows++; e.units += o.qty;
+    }
+    const orphans = [...om.values()].sort((a, b) => a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0);
+
+    // ---- self-audit ----
+    const counts = { countRows, movementRows, audited: skus.size, refusedCounts: refusedCounts.length,
+      applied: applied.length, refusedMoves: refusedMoves.length, orphanRows: orphanRows.length,
+      held: held.length, missingSkus: missing.length, surplusSkus: surplus.length,
+      forgivenSkus: forgiven.length, cleanSkus: clean.length, orphanSkuCount: orphans.length };
+    const tie1 = counts.audited + counts.refusedCounts === counts.countRows;
+    const tie2 = counts.applied + counts.refusedMoves + counts.orphanRows + counts.held === counts.movementRows;
+    const tie3 = counts.missingSkus + counts.surplusSkus + counts.forgivenSkus + counts.cleanSkus === counts.audited;
+    // independent recount: per-type sums re-accumulated in REVERSE file order
+    let tie4 = true;
+    {
+      const acc = new Map();
+      for (let i = applied.length - 1; i >= 0; i--) {
+        const a = applied[i];
+        if (!acc.has(a.sku)) acc.set(a.sku, { sale: 0, received: 0, return: 0, writeoff: 0 });
+        acc.get(a.sku)[a.type] += a.qty;
+      }
+      for (const l of out) {
+        const t = acc.get(l.sku) || { sale: 0, received: 0, return: 0, writeoff: 0 };
+        const exp2 = l.first + t.received + t.return - t.sale - t.writeoff;
+        if (l.second - exp2 !== l.variance) { tie4 = false; break; }
+      }
+    }
+    const refusedShare_tenths = pctTenths(counts.refusedMoves, counts.movementRows);
+    const tie5 = refusedShare_tenths <= 100;
+    const trusted = tie1 && tie2 && tie3 && tie4 && tie5;
+    let banner = "";
+    if (!trusted) {
+      banner = "DO NOT TRUST THIS AUDIT — " + (!tie1 ? "the count buckets do not tie."
+        : !tie2 ? "the movement buckets do not tie."
+        : !tie3 ? "the verdict buckets do not tie."
+        : !tie4 ? "the independent recount disagrees with the audit."
+        : "too many movement rows refused (" + fmtPctT(refusedShare_tenths) + "). Fix the export and run it again.");
+    }
+    let missBanner = "";
+    if (trusted && shrinkPct_tenths > 20) {
+      missBanner = "DO NOT CALL THIS A MISCOUNT — " + fmtMoney(missingValue) +
+        " missing with no row to explain it (" + fmtPctT(shrinkPct_tenths) + " of what the shelves held).";
+    }
+
+    return { settings: S, counts,
+      units: { availableUnits, missingUnits, surplusUnits, forgivenUnits, recordedLossUnits, soldUnits },
+      money: { availableValue, missingValue, surplusValue, forgivenValue, recordedLossValue, headlineValue },
+      shrinkPct_tenths,
+      skus: out,
+      spotlight: missing.filter(l => l.unitCost >= S.spotlightCents)
+        .map(l => ({ sku: l.sku, item: l.item, unitCost: l.unitCost, units: -l.variance, value: -l.variance * l.unitCost })),
+      orphans, refusedCounts, refusedMoves, held,
+      recon: { tie1, tie2, tie3, tie4, refusedShare_tenths, trusted, banner, missBanner } };
+  }
+
+  root.SC = { audit, _cents: cents, _units: units, _validDate: validDate,
+    _halfUpDiv: halfUpDiv, _fmtPctT: fmtPctT, _fmtMoney: fmtMoney };
+})(typeof window !== "undefined" ? window : (typeof module !== "undefined" ? module.exports : this));
+</script>
+<script>
+const SAMPLE_C = "SKU,Item,Unit Cost,First Count,First Date,Second Count,Second Date\nEL-0144,Outlet & switch combo pack,14.20,26,2026-08-31,14,2026-11-22\nEL-0215,LED work light - rechargeable,34.00,10,2026-08-31,5,2026-11-22\nEL-0388,Outlet tester,12.50,8,2026-08-31,7,2026-11-22\nEL-0509,Extension cord - 50 ft,27.60,18,2026-08-31,6,2026-11-22\nEL-0612,Smoke alarm - 10 yr battery,18.40,22,2026-08-31,13,2026-11-22\nFA-0105,Deck screws - 5 lb box,26.50,18,2026-08-31,9,2026-11-22\nFA-0220,Finish nails - 1 lb box,4.80,25,2026-08-31,20,2026-11-22\nFA-0512,Wood screws - 5 lb box,24.00,16,2026-08-31,12,2026-11-22\nGD-0330,Garden hose - 75 ft,23.90,14,2026-08-31,14,2026-11-22\nGD-0518,Pruning shears - bypass,16.70,12,2026-08-31,14,2026-11-22\nHW-0102,Claw hammer - 16 oz,11.40,20,2026-08-31,7,2026-11-22\nHW-0231,Tape measure - 25 ft,9.75,18,2026-08-31,15,2026-11-22\nHW-0310,Screwdriver set - 12 pc,19.90,12,2026-08-31,16,2026-11-22\nHW-0477,Adjustable wrench - 10 in,13.60,14,2026-08-31,14,2026-11-22\nHW-0655,Utility knife,8.90,15,2026-08-31,13,2026-11-22\nHW-0788,Keyless entry door lock,62.00,9,2026-08-31,3,2026-11-22\nHW-0821,Padlock - weatherproof,15.25,16,2026-08-31,24,2026-11-22\nHW-1104,18V cordless drill kit,89.00,14,2026-08-31,6,2026-11-22\nPL-0120,PVC cement - 8 oz,6.90,24,2026-08-31,12,2026-11-22\nPL-0233,Kitchen faucet - single handle,74.00,7,2026-08-31,4,2026-11-22\nPL-0389,Toilet repair kit,21.50,13,2026-08-31,16,2026-11-22\nPL-0466,Brass pipe-fitting assortment pack,28.40,12,2026-08-31,9,2026-11-22\nPT-0101,Interior semi-gloss - gallon,18.75,35,2026-08-31,46,2026-11-22\nPT-0144,Painter's tape - 1.88 in,6.20,30,2026-08-31,20,2026-11-22\nPT-0188,Roller cover 3-pack,7.40,40,2026-08-31,18,2026-11-22\nPT-0255,Deck stain - gallon cedar,21.80,22,2026-08-31,8,2026-11-22\nPT-0290,Paint brush set - 5 pc,9.95,28,2026-08-31,16,2026-11-22\nPT-0312,Interior eggshell paint - gallon white,16.50,40,2026-08-31,30,2026-11-22\nPT-0366,Drop cloth - canvas 9x12,17.80,15,2026-08-31,22,2026-11-22\nSP-0444,Wet/dry vacuum - 6 gal,79.00,6,2026-08-31,24,2026-11-22\nSP-0633,Tankless water heater,439.00,5,2026-08-31,3,2026-11-22\nSP-0710,Portable generator - 2200W,549.00,4,2026-08-31,4,2026-11-22\nSP-0901,Airless paint sprayer,189.00,4,2026-08-31,1,2026-11-22\nHW-0231,Tape measure - 25 ft (recount?),9.75,18,2026-08-31,17,2026-11-22\nPT-0401,Primer - quart,8.60,11,2026-08-31,?,2026-11-22\nGL-0117,Window glass pane - custom cut,market,6,2026-08-31,6,2026-11-22\n";
+const SAMPLE_M = "Date,Type,SKU,Qty,Ref\n2026-08-30,sale,PT-0312,1,S-0830\n2026-09-02,sale,HW-1104,1,S-5001\n2026-09-02,sale,EL-0612,2,S-5002\n2026-09-02,sale,FA-0105,8,S-5003\n2026-09-03,sale,PT-0312,9,S-5004\n2026-09-03,received,FA-0220,10,R-5005\n2026-09-03,received,HW-0821,20,R-5006\n2026-09-04,sale,SP-0901,1,S-5007\n2026-09-04,sale,PT-0255,1,S-5008\n2026-09-05,sale,EL-0215,2,S-5009\n2026-09-05,received,SP-0444,26,R-5010\n2026-09-07,sale,SP-0901,1,S-5011\n2026-09-07,sale,PT-0255,1,S-5012\n2026-09-07,received,HW-0655,13,R-5013\n2026-09-08,sale,FA-0512,6,S-5014\n2026-09-09,received,PT-0312,20,R-0920\n2026-09-09,sale,HW-0231,6,S-5015\n2026-09-09,sale,PT-0188,3,S-5016\n2026-09-10,received,FA-0512,10,R-2214\n2026-09-10,received,FA-0512,10,R-2214\n2026-09-10,sale,PT-0144,4,S-5017\n2026-09-10,received,EL-0388,10,R-5018\n2026-09-10,sale,PL-0389,3,S-5019\n2026-09-10,received,FA-0105,5,R-5020\n2026-09-11,sale,HW-0788,3,S-5021\n2026-09-11,received,PT-0255,12,R-1112\n2026-09-12,sale,PT-0312,2,S-5022\n2026-09-12,sale,PL-0120,17,S-5023\n2026-09-12,sale,SP-0444,1,S-5024\n2026-09-13,received,PL-0466,10,R-1310\n2026-09-13,received,PT-0101,16,R-5025\n2026-09-14,sale,PT-0312,6,S-5026\n2026-09-14,sale,PT-0188,4,S-5027\n2026-09-16,sale,HW-1104,4,S-5028\n2026-09-16,sale,GD-0914,7,S-ORF1\n2026-09-17,sale,PL-0466,1,S-5029\n2026-09-17,received,HW-0231,8,R-5030\n2026-09-17,sale,HW-0310,1,S-5031\n2026-09-17,sale,PT-0188,18,S-5032\n2026-09-17,received,EL-0612,15,R-5033\n2026-09-17,sale,GD-0330,3,S-5034\n2026-09-18,received,HW-1104,12,R-1808\n2026-09-18,sale,PT-0312,3,S-5035\n2026-09-19,sale,PT-0188,7,S-5036\n2026-09-20,sale,HW-1104,1,S-5037\n2026-09-20,received,PT-0144,13,R-5038\n2026-09-21,received,EL-0215,8,R-2108\n2026-09-22,sale,PL-0233,1,S-5039\n2026-09-23,sale,PL-0120,3,S-5040\n2026-09-24,sale,PL-0466,1,S-5041\n2026-09-25,received,HW-0788,6,R-2506\n2026-09-25,sale,PT-0144,4,S-5042\n2026-09-27,received,HW-0310,28,R-5043\n2026-09-28,sale,PT-0188,10,S-5044\n2026-09-28,sale,EL-0612,11,S-5045\n2026-09-30,return,PT-0312,2,T-3002\n2026-09-30,sale,PT-0101,2,S-5046\n2026-09-31,sale,PT-0144,2,S-0931\n2026-10-01,sale,EL-0215,1,S-5047\n2026-10-01,sale,FA-0105,1,S-5048\n2026-10-02,sale,PT-0255,4,S-5049\n2026-10-03,received,SP-0901,2,R-3302\n2026-10-03,received,PL-0120,17,R-5050\n2026-10-03,return,PL-0389,1,T-5051\n2026-10-04,sale,PT-0255,2,S-5052\n2026-10-04,sale,EL-0509,7,S-5053\n2026-10-05,sale,PT-0290,9,S-5054\n2026-10-06,sale,FA-0512,1,S-5055\n2026-10-06,received,GD-0518,7,R-5056\n2026-10-07,sale,HW-0655,2 boxes,S-37BX\n2026-10-07,sale,HW-0477,5,S-5057\n2026-10-07,sale,PL-0120,5,S-5058\n2026-10-07,sale,PL-0389,5,S-5059\n2026-10-10,sale,PT-0312,3,S-5060\n2026-10-10,sale,FA-0512,4,S-5061\n2026-10-11,return,HW-1104,1,T-4101\n2026-10-11,sale,HW-0655,11,S-5062\n2026-10-11,sale,PL-0389,8,S-5063\n2026-10-12,sale,PT-0312,4,S-5064\n2026-10-12,sale,PT-0144,1,S-5065\n2026-10-12,sale,SP-0710,2,S-5066\n2026-10-13,sale,EL-0215,1,S-5067\n2026-10-13,received,SP-0710,5,R-5068\n2026-10-14,sale,GD-0914,6,S-ORF2\n2026-10-14,sale,SP-0633,1,S-5069\n2026-10-15,sale,HW-1104,1,S-5070\n2026-10-15,sale,HW-0102,13,S-5071\n2026-10-15,sale,PT-0366,1,S-5072\n2026-10-16,sale,PT-0312,6,S-5073\n2026-10-16,writeoff,PT-0255,6,W-4606\n2026-10-17,sale,EL-0215,5,S-5074\n2026-10-18,return,HW-0102,1,T-5075\n2026-10-18,sale,GD-0330,3,S-5076\n2026-10-19,sale,PT-0188,1,\n2026-10-19,sale,HW-0310,3,S-5077\n2026-10-19,sale,EL-0144,9,S-5078\n2026-10-20,sale,SP-0710,3,S-5079\n2026-10-21,sale,HW-0788,2,S-5080\n2026-10-21,received,PT-0188,27,R-5081\n2026-10-22,received,PT-0312,16,R-5216\n2026-10-23,sale,PT-0144,5,S-5082\n2026-10-23,sale,HW-0102,1,S-5083\n2026-10-23,received,HW-0477,25,R-5084\n2026-10-23,sale,EL-0612,4,S-5085\n2026-10-24,sale,SP-0901,1,S-5086\n2026-10-24,sale,PT-0366,8,S-5087\n2026-10-24,sale,EL-0509,5,S-5088\n2026-10-25,received,GD-0330,6,R-5089\n2026-10-25,sale,SP-0444,7,S-5090\n2026-10-26,return,HW-0477,1,T-5091\n2026-10-26,received,PT-0366,16,R-5092\n2026-10-26,sale,PL-0389,10,S-5093\n2026-10-27,sale,PT-0255,9,S-5094\n2026-10-27,sale,FA-0105,6,S-5095\n2026-10-28,sale,EL-0388,-3,S-58NG\n2026-10-28,sale,HW-0655,2,S-5096\n2026-10-28,sale,PL-0120,2,S-5097\n2026-10-29,sale,HW-0310,2,S-5098\n2026-10-30,sale,HW-0788,2,S-5099\n2026-10-30,sale,EL-0215,2,S-5100\n2026-10-30,sale,FA-0220,5,S-5101\n2026-10-30,received,PL-0389,30,R-5102\n2026-10-30,sale,GD-0518,4,S-5103\n2026-11-01,sale,PT-0312,1,S-5104\n2026-11-01,sale,HW-0788,2,S-5105\n2026-11-01,transfer,HW-0231,2,X-6202\n2026-11-01,sale,EL-0388,7,S-5106\n2026-11-05,sale,FA-0512,1,S-5107\n2026-11-05,sale,HW-0310,18,S-5108\n2026-11-05,sale,HW-0477,6,S-5109\n2026-11-06,sale,FA-0220,1,S-5110\n2026-11-06,sale,HW-0477,13,S-5111\n2026-11-06,sale,HW-0821,11,S-5112\n2026-11-06,sale,SP-0633,2,S-5113\n2026-11-07,sale,PT-0188,2,S-5114\n2026-11-07,return,SP-0633,1,T-5115\n2026-11-07,return,FA-0105,1,T-5116\n2026-11-08,sale,HW-0477,1,S-5117\n2026-11-08,sale,HW-0821,1,S-5118\n2026-11-09,sale,PL-0466,5,S-5119\n2026-11-10,sale,GD-0914,5,S-ORF3\n2026-11-10,sale,PT-0144,8,S-5120\n2026-11-10,sale,FA-0220,8,S-5121\n2026-11-10,sale,PT-0188,5,S-5122\n2026-11-11,sale,PT-0255,1,S-5123\n2026-11-11,sale,EL-0388,2,S-5124\n2026-11-11,sale,PL-0389,2,S-5125\n2026-11-12,sale,FA-0512,2,S-5126\n2026-11-12,sale,EL-0388,3,S-5127\n2026-11-13,sale,HW-1104,2,S-5128\n2026-11-13,sale,PT-0101,3,S-5129\n2026-11-13,sale,PL-0120,2,S-5130\n2026-11-14,sale,HW-0231,4,S-5131\n2026-11-14,sale,HW-0655,1,S-5132\n2026-11-15,return,EL-0612,1,T-5133\n2026-11-16,sale,EL-0612,3,S-5134\n2026-11-17,sale,PT-0312,18,S-5135\n2026-11-18,sale,PL-0466,1,S-5136\n2026-11-18,sale,HW-0477,1,S-5137\n2026-11-18,sale,EL-0144,3,S-5138\n2026-11-18,sale,GD-0518,1,S-5139\n2026-11-19,sale,PT-0290,3,S-5140\n2026-11-20,sale,PL-0233,2,S-5141\n2026-11-21,sale,HW-1104,6,S-5142\n2026-11-22,sale,EL-0612,5,S-5143\n2026-11-23,received,HW-1104,10,R-9923\n";
+const $=id=>document.getElementById(id);
+const money=c=>(c<0?"-$":"$")+Math.abs(c/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pctT=t=>Math.floor(t/10)+"."+(t%10)+"%";
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+let LAST=null;
+function settings(){
+  return {forgiveUnits:+$("s_forgive").value, spotlightCents:+$("s_spot").value, lens:$("s_lens").value};
+}
+function run(){
+  const c=$("ccsv").value,m=$("mcsv").value;
+  if(!c.trim()||!m.trim()){alert("Paste both files (or load the sample store).");return;}
+  let R;
+  try{R=window.SC.audit(c,m,settings());}catch(e){alert(e.message);return;}
+  LAST=R;
+  $("out").style.display="block";
+  const b=$("banner"),mb=$("missban");
+  if(!R.recon.trusted){b.style.display="block";b.textContent=R.recon.banner;}
+  else b.style.display="none";
+  if(R.recon.missBanner){mb.style.display="block";mb.textContent=R.recon.missBanner;}
+  else mb.style.display="none";
+  const withheld=!R.recon.trusted;
+  $("t_head_k").textContent=R.settings.lens==="all"?"Missing + recorded write-offs":"Missing, unexplained";
+  $("t_head").textContent=withheld?"—":money(R.money.headlineValue);
+  $("t_head_s").textContent=withheld?"findings withheld — see the audit panel":R.units.missingUnits+" units across "+R.counts.missingSkus+" products"+(R.settings.lens==="all"?" + "+R.units.recordedLossUnits+" written off":"");
+  $("t_pct").textContent=withheld?"—":pctT(R.shrinkPct_tenths);
+  $("t_pct_s").textContent=withheld?"":money(R.money.missingValue)+" unexplained of "+money(R.money.availableValue)+" available at cost";
+  $("t_plus").textContent=withheld?"—":R.units.surplusUnits+" units";
+  $("t_plus_s").textContent=withheld?"":money(R.money.surplusValue)+" of surplus — usually a delivery keyed wrong";
+  $("t_off").textContent=withheld?"—":money(R.money.recordedLossValue);
+  $("t_off_s").textContent=withheld?"":R.units.recordedLossUnits+" units written off on the record — explained, not shrink";
+  $("spotwhy").textContent="Missing products with a unit cost of "+money(R.settings.spotlightCents)+" or more — the shortlist a pocket prefers. Forgiveness dial: "+R.settings.forgiveUnits+" unit(s) of count noise per product.";
+  $("spotT").innerHTML=withheld?"":R.spotlight.map(s=>
+    `<tr><td>${esc(s.sku)}</td><td>${esc(s.item)}</td><td class="n">${money(s.unitCost)}</td><td class="n">${s.units}</td><td class="n"><b>${money(s.value)}</b></td></tr>`).join("")
+    ||`<tr><td colspan="5" class="note">Nothing above this cost line is missing.</td></tr>`;
+  $("skuswhy").textContent="Expected = first count + received + returns − sales − write-offs, applied only inside each product's count window. Variance = counted − expected.";
+  $("skuT").innerHTML=withheld?"":R.skus.filter(l=>l.class!=="CLEAN").map(l=>{
+    const chip=l.class==="MISSING"?'<span class="chip miss">MISSING</span>':l.class==="SURPLUS"?'<span class="chip plus">APPEARED</span>':'<span class="chip forg">forgiven</span>';
+    const val=(l.class==="MISSING"?-l.variance:l.class==="SURPLUS"?l.variance:Math.abs(l.variance))*l.unitCost;
+    const inn=l.received+l.returns, outn=l.sales+l.writeoffs;
+    return `<tr><td>${esc(l.sku)}</td><td>${esc(l.item)}${chip}${l.writeoffs?'<span class="chip off">'+l.writeoffs+' written off</span>':''}</td><td class="n">${l.first}</td><td class="n">+${inn}</td><td class="n">−${outn}</td><td class="n">${l.expected}</td><td class="n">${l.second}</td><td class="n ${l.variance<0?"delta up":"delta dn"}">${l.variance>0?"+":""}${l.variance}</td><td class="n"><b>${money(val)}</b></td></tr>`;}).join("")
+    ||`<tr><td colspan="9" class="note">Every product's count matches its ledger.</td></tr>`;
+  $("orphT").innerHTML=withheld?"":R.orphans.map(o=>
+    `<tr><td>${esc(o.sku)}</td><td class="n">${o.rows}</td><td class="n">${o.units}</td></tr>`).join("")
+    ||`<tr><td colspan="3" class="note">No orphans — every movement found its product.</td></tr>`;
+  const refRows=R.refusedCounts.map(r=>`<tr><td>counts.csv</td><td class="n">${r.line}</td><td>${esc(r.sku)}</td><td>${esc(r.reason)}</td></tr>`)
+    .concat(R.refusedMoves.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td>${esc(r.ref)}</td><td>${esc(r.reason)}</td></tr>`))
+    .concat(R.held.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td>${esc(r.ref)}</td><td>HELD — ${esc(r.reason)}</td></tr>`));
+  $("refT").innerHTML=refRows.join("")||`<tr><td colspan="4" class="note">Nothing refused.</td></tr>`;
+  const rc=R.recon;
+  $("recon").innerHTML=
+   `self-audit, run every time\n`+
+   `counts     ${R.counts.countRows} rows = ${R.counts.audited} audited + ${R.counts.refusedCounts} refused  <span class="${rc.tie1?"ok":"bad"}">${rc.tie1?"ties":"DOES NOT TIE"}</span>\n`+
+   `movements  ${R.counts.movementRows} rows = ${R.counts.applied} applied + ${R.counts.refusedMoves} refused + ${R.counts.orphanRows} orphaned + ${R.counts.held} held  <span class="${rc.tie2?"ok":"bad"}">${rc.tie2?"ties":"DOES NOT TIE"}</span>\n`+
+   `verdicts   ${R.counts.missingSkus} missing + ${R.counts.surplusSkus} appeared + ${R.counts.forgivenSkus} forgiven + ${R.counts.cleanSkus} clean = ${R.counts.audited}  <span class="${rc.tie3?"ok":"bad"}">${rc.tie3?"ties":"DOES NOT TIE"}</span>\n`+
+   `recount    every variance re-derived by a second pass, compared  <span class="${rc.tie4?"ok":"bad"}">${rc.tie4?"matches":"DISAGREES"}</span>\n`+
+   `refused    ${pctT(rc.refusedShare_tenths)} of movement rows  <span class="${rc.refusedShare_tenths<=100?"ok":"bad"}">${rc.refusedShare_tenths<=100?"within tolerance":"over 10% — do not trust"}</span>`;
+  window.__done=true;
+}
+$("sample").addEventListener("click",()=>{$("ccsv").value=SAMPLE_C;$("mcsv").value=SAMPLE_M;$("fict").style.display="inline-block";window.__done=false;run();});
+$("go").addEventListener("click",()=>{window.__done=false;run();});
+for(const id of ["s_forgive","s_spot","s_lens"]) $(id).addEventListener("change",()=>{if(LAST){window.__done=false;run();}});
+$("dl").addEventListener("click",()=>{
+  if(!LAST){alert("Count first.");return;}
+  const rows=[["SKU","Item","Unit cost","First","Received","Returns","Sales","Writeoffs","Expected","Counted","Variance","Verdict"]].concat(
+    LAST.skus.map(l=>[l.sku,l.item,(l.unitCost/100).toFixed(2),l.first,l.received,l.returns,l.sales,l.writeoffs,l.expected,l.second,l.variance,l.class]));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const b=new Blob([csv],{type:"text/csv"});const u=URL.createObjectURL(b);
+  const a=document.createElement("a");a.href=u;a.download="shrinkage_verdicts.csv";a.click();URL.revokeObjectURL(u);
+});
+window.__loaded=true;
+</script></body></html>

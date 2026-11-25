@@ -1,0 +1,71 @@
+THE SHRINKAGE COUNTER — the exact prompts from the episode, word for word.
+Paste them into your AI assistant in order. Prompt 1 builds the first version; prompts 2 and 3
+are the fixes from the episode — they exist because the first two versions were wrong in ways
+worth understanding before you trust any tool with your inventory.
+
+================================ PROMPT 1 ================================
+
+Build me a single HTML file I can open in my browser, no internet, no account, that tells me
+what inventory walked out of my store.
+
+What it's for: I run a small retail shop. Twice a year we count everything on the shelves. I
+have the count sheet and I have the movement ledger between the counts — sales, deliveries,
+customer returns, and damaged stock we wrote off. I want to know which products are missing
+units that nothing in the ledger explains, and what those units cost me.
+
+Data in: two pastes.
+1) The count sheet: CSV with columns SKU, Item, Unit Cost, First Count, First Date,
+   Second Count, Second Date.
+2) The movements between the counts: CSV with columns Date, Type, SKU, Qty, Ref — where Type
+   is sale, received, return, or writeoff, and Ref is the receipt or delivery reference.
+
+What I want out: for every product, what the second count SHOULD have been given the first
+count and the movements, what it actually was, and the difference — in units and in dollars at
+my cost. Total it up. Show me the worst offenders first. Show your arithmetic, not just a
+verdict.
+
+================================ PROMPT 2 ================================
+
+The first version poured the whole store into one bucket and told me my inventory was 95.7%
+accurate. That number is useless: a surplus on one shelf cancelled missing units on another,
+so four gallons of paint that appeared from nowhere gave my missing drills an alibi. Rebuild
+the rules:
+
+- EVERY PRODUCT KEEPS ITS OWN LEDGER. A drill that's missing is missing, no matter what the
+  paint aisle did. Never net one product's surplus against another product's loss.
+- Value each product's variance at ITS OWN unit cost. No averages, ever.
+- A surplus is its own finding — usually a delivery keyed wrong — listed separately, never
+  used to shrink the missing total.
+- A movement whose SKU is not on the count sheet is NOT silently created or skipped — flag it
+  loudly: this product sells but was never counted.
+
+================================ PROMPT 3 ================================
+
+Now make it trustworthy enough to accuse a shelf of theft.
+
+- All arithmetic in integer units and integer cents. No floating-point dollars anywhere.
+- A count window per product: only movements dated AFTER the first count and ON OR BEFORE the
+  second count touch its ledger. A delivery that arrived the day after the second count
+  belongs to the next audit, not this one. Refuse out-of-window rows with the reason printed.
+- A reference number seen twice is HELD, not applied — one delivery must never count double.
+  List every held row.
+- Refuse what you can't read, out loud, with the line number: a date that doesn't exist, a
+  quantity that isn't a positive whole number, a movement type you don't know, a count or cost
+  that isn't a number. Never guess.
+- A written-off unit is an EXPLAINED loss. It never counts as shrink, and it is never billed
+  twice. Give me a switch to include or exclude recorded write-offs from the headline number.
+- Two more dials: how many units of count noise to forgive per product, and a unit-cost
+  spotlight for the expensive stuff worth walking out with.
+- The page audits itself on every run: rows in = applied + refused + orphaned + held; the
+  verdicts re-derived by an independent second pass and compared; and if too many rows are
+  refused, print DO NOT TRUST THIS AUDIT across the page and withhold the findings entirely.
+  A confident answer from mangled data is worse than no answer.
+
+=========================== THE SECOND OPINION ===========================
+
+The episode also used an independent checker — the same rules implemented again in Python by a
+separate session, sharing no code with the page — run on the same two files. checker.py is in
+this folder. That second opinion is what caught the sixteen-drill false accusation, the
+double-counted delivery, and the write-offs billed twice in version two. When two
+implementations disagree, one of them is wrong, and it is worth finding out which before you
+accuse anybody of anything.
