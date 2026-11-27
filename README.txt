@@ -20,14 +20,14 @@ WHAT'S IN THIS FOLDER
 - SPEC.md .................. the frozen rule set both implementations were held to
 
 HOW TO USE IT ON YOUR OWN STORE
-1. Open Shrinkage_Counter.html. Click "Load the sample store" to see it work.
+1. Open Shrinkage_Counter.html. Click "Try the sample business" to see it work.
 2. Make your count sheet a CSV with columns: SKU, Item, Unit Cost, First Count, First Date,
    Second Count, Second Date. (Unit Cost = what one unit costs YOU, not the sticker price.)
 3. Export the movements between those two dates as: Date, Type, SKU, Qty, Ref — types are
    sale, received, return, writeoff. Most POS systems can export something close; if your
    export names columns differently, hand your file and PROMPTS.txt's first prompt to an AI
    assistant and tell it what your software calls things.
-4. Paste both, set the dials, and read the verdicts. The tool changes nothing and sends
+4. Drop in (or paste) both files, set the dials, and read the verdicts. The tool changes nothing and sends
    nothing.
 
 HONEST LIMITS

@@ -2,88 +2,281 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Shrinkage Counter</title>
+<meta name="description" content="Free, offline shrinkage counter: two stock counts and the movements between them in; every missing unit named on a map of your shelves.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='12' fill='%23f4d9cd'/%3E%3Crect x='12' y='14' width='40' height='8' rx='3' fill='%238a5a2b'/%3E%3Crect x='12' y='28' width='40' height='8' rx='3' fill='%238a5a2b'/%3E%3Crect x='12' y='42' width='26' height='8' rx='3' fill='%238a5a2b'/%3E%3Crect x='42' y='42' width='10' height='8' rx='3' fill='%23c2412d'/%3E%3C/svg%3E">
+<!-- IDENTITY: "Map / Floorplan" — humanist sans, blush drawing sheet with a title block, store drawn as aisles of product tiles. (11-27 identity rule) -->
 <style>
-:root{--ink:#26221E;--dim:#6E675E;--line:#DCD5C8;--paper:#F8F5EE;--panel:#FFFFFF;--acc:#7C3A2A;--sig:#44617A;--warn:#A4312A;--ok:#2F6B4F;
---mono:"SF Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);padding:26px 30px 60px}
-h1{font-size:26px;letter-spacing:-.01em}
-h1 small{font-size:14px;color:var(--dim);font-weight:400;margin-left:10px}
-.sub{color:var(--dim);font-size:14px;margin:4px 0 16px}
-#banner,#missban{display:none;color:#fff;font-weight:800;font-size:19px;padding:12px 18px;border-radius:10px;margin:0 0 16px}
-#banner{background:var(--warn)} #missban{background:var(--acc)}
-.wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-textarea{width:100%;height:120px;font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:var(--ink)}
-label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:5px}
-.bar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
-.bar .f{display:flex;flex-direction:column;gap:5px}
-select{font:15px var(--sans);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:230px}
-button{font:15px/1 var(--sans);font-weight:700;padding:11px 20px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
-button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+:root{
+  --bg:#f8efe9; --sheet:#fffaf6; --surface:#fffdfb; --surface-2:#f7ebe4; --ink:#2b1d17; --mute:#6c5850; --dim:#9a857b; --line:#ead6cb; --plan:#d8b6a3;
+  --brand:#8a5a2b; --brand-ink:#ffffff; --blush:#f2d3c5; --blush-2:#fbe9e1;
+  --miss:#c2412d; --miss-ink:#ffffff; --miss-bg:#fbe4de; --plus:#3e6a8a; --plus-bg:#e3edf4; --forg:#9a857b; --clean:#efe1d8;
+  --good:#2f7a54; --good-bg:#e3f2ea; --warn:#9a5a0c; --warn-bg:#fbeedb;
+  --r:12px; --shadow:0 1px 2px rgba(60,30,20,.05),0 12px 30px -18px rgba(60,30,20,.30);
+  --f:Optima,Candara,"Noto Sans","Segoe UI","Gill Sans","Trebuchet MS",system-ui,sans-serif;
+  --m:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#17100d; --sheet:#1e1512; --surface:#231915; --surface-2:#2c1f1a; --ink:#f6e8e0; --mute:#c3aa9d; --dim:#8d766b; --line:#3a2a23; --plan:#5a4035;
+  --brand:#e3a86c; --brand-ink:#2a1708; --blush:#4a2e27; --blush-2:#2e1f1b;
+  --miss:#ff7a63; --miss-ink:#2b0d07; --miss-bg:#3a1a14; --plus:#86b6dc; --plus-bg:#152535; --forg:#8d766b; --clean:#33251f;
+  --good:#5cc690; --good-bg:#12291d; --warn:#eeac57; --warn-bg:#30210e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 14px 34px -18px rgba(0,0,0,.7);}}
+:root[data-theme=dark]{
+  --bg:#17100d; --sheet:#1e1512; --surface:#231915; --surface-2:#2c1f1a; --ink:#f6e8e0; --mute:#c3aa9d; --dim:#8d766b; --line:#3a2a23; --plan:#5a4035;
+  --brand:#e3a86c; --brand-ink:#2a1708; --blush:#4a2e27; --blush-2:#2e1f1b;
+  --miss:#ff7a63; --miss-ink:#2b0d07; --miss-bg:#3a1a14; --plus:#86b6dc; --plus-bg:#152535; --forg:#8d766b; --clean:#33251f;
+  --good:#5cc690; --good-bg:#12291d; --warn:#eeac57; --warn-bg:#30210e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 14px 34px -18px rgba(0,0,0,.7);}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.55 var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:inherit}
+.wrap{max-width:1160px;margin:0 auto;padding:0 16px}
+@media(min-width:760px){.wrap{padding:0 28px}}
+/* top bar */
+.bar{display:flex;align-items:center;gap:12px;height:60px}
+.logo{width:30px;height:30px;flex:none;display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;padding:5px;border:1.5px solid var(--brand);border-radius:8px}
+.logo i{background:var(--brand);border-radius:2px}
+.logo i:nth-child(5){background:var(--miss)}
+.bar b{font-weight:700;font-size:17px;letter-spacing:.01em;white-space:nowrap}
+.pill{font-size:12.5px;font-weight:600;color:var(--good);border:1px solid color-mix(in srgb,var(--good) 35%,var(--line));border-radius:999px;padding:4px 11px;white-space:nowrap}
+.sp{flex:1}
+.lnk{color:var(--mute);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap}
+.lnk:hover{color:var(--ink)}
+.tbtn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 11px;font:600 14px var(--f);cursor:pointer}
+@media(max-width:640px){.hide-s{display:none}}
+/* drawing sheet hero */
+.sheet{position:relative;background:var(--sheet);border:1px solid var(--plan);border-radius:var(--r);padding:30px 28px 28px;margin-top:6px;box-shadow:var(--shadow);overflow:hidden}
+.sheet:before{content:"";position:absolute;inset:8px;border:1px solid var(--line);border-radius:8px;pointer-events:none}
+.sheet .grid{display:grid;gap:24px;align-items:end;position:relative}
+@media(min-width:900px){.sheet .grid{grid-template-columns:1.4fr 1fr}}
+.eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--brand)}
+h1{font-size:clamp(30px,4.6vw,48px);line-height:1.06;letter-spacing:-.015em;margin:10px 0 12px;font-weight:700}
+h1 em{font-style:normal;color:var(--miss)}
+.sub{color:var(--mute);font-size:17px;max-width:58ch;margin:0}
+.tblock{border:1.5px solid var(--ink);border-radius:4px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;background:var(--surface);max-width:400px;width:100%;justify-self:end}
+.tblock div{padding:7px 10px;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.tblock div:nth-child(2n){border-right:0}
+.tblock div:nth-last-child(-n+2){border-bottom:0}
+.tblock .wide{grid-column:1/-1;border-right:0;font-size:15px;font-weight:700}
+.tblock small{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700}
+/* intake */
+.intake{display:grid;gap:14px;margin-top:18px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:820px){.intake{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.zone{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.drop{position:relative;display:flex;gap:14px;align-items:center;padding:18px;border-bottom:1px dashed var(--line);cursor:pointer;transition:background .15s}
+.drop:hover,.drop.over{background:var(--blush-2)}
+.drop .ico{flex:none;width:46px;height:46px;border-radius:10px;border:1.5px dashed var(--brand);color:var(--brand);display:grid;place-items:center;font-weight:800}
+.drop.loaded .ico{border-style:solid;background:var(--brand);color:var(--brand-ink)}
+.drop h3{margin:0;font-size:16px;font-weight:700}
+.drop .hint{color:var(--mute);font-size:13.5px}
+.drop .cols{font:11.5px var(--m);color:var(--dim);margin-top:2px}
+.drop .state{font-weight:700;font-size:13px;color:var(--good);margin-top:3px}
+.drop .state:empty{display:none}
+.drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.drop:focus-within{outline:2px solid var(--brand);outline-offset:-2px}
+details.paste summary{cursor:pointer;padding:9px 18px;font-size:13px;color:var(--mute);font-weight:600;list-style:none}
+details.paste summary::-webkit-details-marker{display:none}
+details.paste summary:before{content:"+ ";color:var(--brand);font-weight:800}
+details.paste[open] summary:before{content:"– "}
+details.paste textarea{display:block;width:calc(100% - 28px);margin:0 14px 14px;height:110px;font:12px/1.4 var(--m);border:1px solid var(--line);border-radius:8px;padding:9px;background:var(--surface-2);color:var(--ink);resize:vertical}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;margin-top:14px}
+.dial{display:flex;flex-direction:column;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;flex:1 1 200px}
+.dial label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.dial select{font:650 15px var(--f);color:var(--ink);background:transparent;border:0;outline:0;padding:2px 20px 2px 0;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--brand) 50%),linear-gradient(135deg,var(--brand) 50%,transparent 50%);background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+.dial select option{color:#111;background:#fff}
+.dial:focus-within{border-color:var(--brand)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0 4px}
+.btn{appearance:none;border:1px solid var(--line);border-radius:10px;padding:11px 18px;font:700 15px var(--f);cursor:pointer;background:var(--surface);color:var(--ink);transition:transform .1s,background .15s}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);box-shadow:0 8px 20px -12px var(--brand)}
+.btn.primary:hover{transform:translateY(-1px)}
+.btn.ink{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .note{font-size:13px;color:var(--dim)}
-#fict{display:none;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--sig);border:1px solid var(--sig);border-radius:7px;padding:4px 10px}
-#tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:6px 0 20px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+#fict{display:none;margin-top:4px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--plus);border:1px solid var(--plus);border-radius:7px;padding:3px 9px}
+#err{display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:var(--miss-bg);color:var(--miss);font-weight:600}
+/* results */
+.empty{margin-top:22px;padding:40px 20px;text-align:center;color:var(--mute);background:var(--surface);border:1px dashed var(--plan);border-radius:var(--r)}
+.empty .mini{display:grid;grid-template-columns:repeat(6,22px);gap:5px;justify-content:center;margin:0 auto 14px}
+.empty .mini i{height:14px;border-radius:3px;background:var(--clean)}
+.empty .mini i.m{background:var(--miss)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+.banner{display:none;margin:24px 0 12px;padding:16px 20px;border-radius:var(--r);border:1px solid;position:relative;padding-left:62px}
+.banner:before{content:"!";position:absolute;left:18px;top:16px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--sheet);font-weight:900}
+.banner .tag{display:block;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.banner .txt{display:block;font-size:19px;font-weight:700;line-height:1.3;margin-top:2px}
+#missban{background:var(--miss-bg);border-color:color-mix(in srgb,var(--miss) 35%,transparent);color:var(--miss)} #missban:before{background:var(--miss)}
+#banner{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 35%,transparent);color:var(--warn)} #banner:before{background:var(--warn)}
+#tiles{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));margin:14px 0 6px}
+@media(min-width:900px){#tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0;border-top:4px solid var(--plan)}
 .tile .k{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
-.tile .v{font-size:29px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;padding:2px 0}
-.tile .s{font-size:12px;color:var(--dim);margin-top:3px}
-.tile.acc .v{color:var(--acc)} .tile.warn .v{color:var(--warn)} .tile.sig .v{color:var(--sig)}
-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
-section h2{font-size:17px;margin-bottom:4px}
-section .why{font-size:13px;color:var(--dim);margin-bottom:10px}
+.tile .v{font-size:clamp(22px,2.8vw,30px);font-weight:700;margin-top:6px;letter-spacing:-.01em;overflow-wrap:anywhere}
+.tile .s{font-size:12.5px;color:var(--mute);margin-top:2px}
+.tile.warn{border-top-color:var(--miss)} .tile.warn .v{color:var(--miss)}
+.tile.acc{border-top-color:var(--brand)} .tile.acc .v{color:var(--brand)}
+.tile.sig{border-top-color:var(--plus)} .tile.sig .v{color:var(--plus)}
+/* the floorplan */
+.sec{margin:30px 0 10px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sec h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.005em}
+.sec .why2{color:var(--mute);font-size:13.5px}
+.plan{background:var(--sheet);border:1px solid var(--plan);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--mute);margin:0 2px 14px}
+.legend s{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;text-decoration:none}
+.aisles{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.aisle{border:1px solid var(--plan);border-radius:10px;background:var(--surface);padding:10px 10px 12px;position:relative}
+.aisle h4{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);display:flex;justify-content:space-between}
+.aisle h4 span{color:var(--miss);letter-spacing:0}
+.shelf{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px;border-bottom:3px solid var(--plan)}
+.prod{min-width:54px;flex:1 1 54px;max-width:96px;height:52px;border-radius:7px;background:var(--clean);display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;font-size:10.5px;color:var(--mute);position:relative;cursor:default}
+.prod .sku{font:600 9.5px var(--m);opacity:.85}
+.prod .d{font-size:15px;font-weight:800;align-self:flex-end;line-height:1}
+.prod.MISSING{background:var(--miss);color:var(--miss-ink)}
+.prod.MISSING.l1{background:color-mix(in srgb,var(--miss) 55%,var(--surface));color:var(--ink)}
+.prod.SURPLUS{background:var(--plus-bg);color:var(--plus);outline:1.5px solid var(--plus);outline-offset:-1.5px}
+.prod.FORGIVEN{background:transparent;outline:1.5px dashed var(--forg);outline-offset:-1.5px}
+.prod.spot:after{content:"$";position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--ink);color:var(--sheet);font:800 10px var(--f);display:grid;place-items:center}
+.offplan{margin-top:12px;border:1.5px dashed var(--plus);border-radius:10px;padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--plus);font-size:13px}
+.offplan .prod{max-width:120px;background:var(--plus-bg);color:var(--plus)}
+/* tables */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card .why{padding:12px 16px 0;color:var(--mute);font-size:13.5px;margin:0}
+.tbl{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:left;padding:5px 8px;border-bottom:2px solid var(--line)}
-td{padding:6px 8px;border-top:1px solid #EFEAE0;font-variant-numeric:tabular-nums;vertical-align:top}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);text-align:left;padding:12px 14px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:700}
+td{padding:9px 14px;border-top:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+tbody tr:first-child td{border-top:0}
+tbody tr:hover td{background:var(--blush-2)}
 td.n,th.n{text-align:right}
-.chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.05em;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:1px}
-.chip.miss{color:#fff;background:var(--warn)}
-.chip.plus{color:#fff;background:var(--sig)}
-.chip.forg{color:var(--dim);background:#EFEAE0}
-.chip.off{color:#fff;background:var(--ok)}
-.delta.up{color:var(--warn);font-weight:700}.delta.dn{color:var(--ok);font-weight:700}
-#recon{font:13.5px/1.7 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
-#recon .ok{color:var(--ok);font-weight:700} #recon .bad{color:var(--warn);font-weight:700}
-footer{margin-top:24px;font-size:12.5px;color:var(--dim)}
-@media (max-width:900px){#tiles{grid-template-columns:repeat(2,1fr)}.wrap{grid-template-columns:1fr}}
+td.item{white-space:normal;min-width:200px}
+td code{font:12.5px var(--m);color:var(--mute)}
+.chip{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.05em;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+.chip.miss{color:var(--miss-ink);background:var(--miss)}
+.chip.plus{color:var(--plus);background:var(--plus-bg)}
+.chip.forg{color:var(--mute);background:var(--surface-2)}
+.chip.off{color:var(--good);background:var(--good-bg)}
+.delta.up{color:var(--miss);font-weight:800}.delta.dn{color:var(--plus);font-weight:800}
+.grid2{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}}
+#recon{list-style:none;margin:0;padding:6px 0}
+#recon li{display:flex;gap:12px;align-items:flex-start;padding:10px 16px;border-top:1px solid var(--line);font-size:13.5px}
+#recon li:first-child{border-top:0}
+#recon li .lab{flex:none;width:88px;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding-top:2px}
+#recon li .eq{flex:1;color:var(--mute)}
+#recon .ok,#recon .bad{flex:none;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap}
+#recon .ok{color:var(--good);background:var(--good-bg)} #recon .bad{color:var(--miss);background:var(--miss-bg)}
+.hidden{display:none}
+footer{color:var(--dim);font-size:13px;padding:30px 0 50px;margin-top:40px;border-top:1px solid var(--plan);display:grid;gap:6px}
+footer a{color:var(--mute)}
+.fade{animation:fade .4s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.bar .lnk,.bar .tbtn,.intake,.controls,.actions,#empty{display:none!important} body{background:#fff;color:#000} .sheet,.plan{box-shadow:none} .sheet:before{display:none}}
 </style></head><body>
-<h1>The Shrinkage Counter <small>every unit accounts for itself, or gets named</small></h1>
-<div class="sub">Everything runs in this page. Nothing you paste leaves your machine. <span id="fict">fictional sample data</span></div>
-<div id="banner"></div>
-<div id="missban"></div>
 <div class="wrap">
-  <div><label>the count sheet (CSV: SKU, Item, Unit Cost, First Count, First Date, Second Count, Second Date)</label><textarea id="ccsv" spellcheck="false"></textarea></div>
-  <div><label>the movements between the counts (CSV: Date, Type, SKU, Qty, Ref — types: sale, received, return, writeoff)</label><textarea id="mcsv" spellcheck="false"></textarea></div>
+<header class="bar">
+  <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  <b>The Shrinkage Counter</b><span class="pill hide-s">● runs offline · files stay on your computer</span>
+  <span class="sp"></span>
+  <a class="lnk hide-s" href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">More free tools</a>
+  <button class="tbtn" id="theme" aria-label="Toggle dark mode">◐</button>
+</header>
+
+<section class="sheet">
+  <div class="grid">
+    <div>
+      <div class="eyebrow">Build It With AI · Episode 41 · free tool</div>
+      <h1>Every unit accounts for itself, <em>or gets named on the map.</em></h1>
+      <p class="sub">Two stock counts and the movements between them in. Each product gets its own ledger inside its own count window, and every unit the ledger can't explain shows up on a map of your shelves. Nothing is uploaded anywhere.</p>
+    </div>
+    <div class="tblock" aria-label="Drawing title block">
+      <div class="wide"><small>Drawing</small>The store, as counted</div>
+      <div><small>Sheet</small>Episode 41</div>
+      <div><small>Scale</small>1 tile = 1 product</div>
+      <div><small>Red tile</small>units missing</div>
+      <div><small>Blue tile</small>units that appeared</div>
+    </div>
+  </div>
+</section>
+
+<div class="intake">
+  <div class="zone">
+    <label class="drop" id="dropc"><input type="file" id="fc" accept=".csv,text/csv" aria-label="Choose your count sheet CSV">
+      <span class="ico" aria-hidden="true">A</span>
+      <span><h3>The count sheet (CSV)</h3><span class="hint">Both counts, one row per product. Drop it here or click.</span>
+      <div class="cols">SKU, Item, Unit Cost, First Count, First Date, Second Count, Second Date</div><div class="state" id="statec"></div></span></label>
+    <details class="paste"><summary>or paste it</summary><textarea id="ccsv" spellcheck="false" aria-label="Paste the count sheet CSV"></textarea></details>
+  </div>
+  <div class="zone">
+    <label class="drop" id="dropm"><input type="file" id="fm" accept=".csv,text/csv" aria-label="Choose your movements CSV">
+      <span class="ico" aria-hidden="true">B</span>
+      <span><h3>The movements between the counts (CSV)</h3><span class="hint">Sales, deliveries, returns, write-offs. Drop it here or click.</span>
+      <div class="cols">Date, Type, SKU, Qty, Ref · types: sale, received, return, writeoff</div><div class="state" id="statem"></div></span></label>
+    <details class="paste"><summary>or paste it</summary><textarea id="mcsv" spellcheck="false" aria-label="Paste the movements CSV"></textarea></details>
+  </div>
 </div>
-<div class="bar">
-  <button id="sample">Load the sample store</button>
-  <button id="go" class="primary">Count what's missing</button>
-  <div class="f"><label for="s_forgive">count noise to forgive</label><select id="s_forgive"><option value="0">none — every unit answers</option><option value="1" selected>1 unit per product</option><option value="2">2 units per product</option></select></div>
-  <div class="f"><label for="s_spot">spotlight: unit cost at least</label><select id="s_spot"><option value="2500">$25</option><option value="5000" selected>$50</option><option value="10000">$100</option></select></div>
-  <div class="f"><label for="s_lens">loss lens</label><select id="s_lens"><option value="unexplained" selected>unexplained only</option><option value="all">include recorded write-offs</option></select></div>
-  <button id="dl">Download the verdicts (CSV)</button>
+
+<div class="controls">
+  <div class="dial"><label for="s_forgive">Count noise to forgive</label><select id="s_forgive"><option value="0">none — every unit answers</option><option value="1" selected>1 unit per product</option><option value="2">2 units per product</option></select></div>
+  <div class="dial"><label for="s_spot">Spotlight: unit cost at least</label><select id="s_spot"><option value="2500">$25</option><option value="5000" selected>$50</option><option value="10000">$100</option></select></div>
+  <div class="dial"><label for="s_lens">Loss lens</label><select id="s_lens"><option value="unexplained" selected>unexplained only</option><option value="all">include recorded write-offs</option></select></div>
 </div>
-<div id="out" style="display:none">
-<div id="tiles">
-  <div class="tile warn"><div class="k" id="t_head_k">Missing, unexplained</div><div class="v" id="t_head">—</div><div class="s" id="t_head_s"></div></div>
-  <div class="tile acc"><div class="k">Share of what the shelves held</div><div class="v" id="t_pct">—</div><div class="s" id="t_pct_s"></div></div>
-  <div class="tile sig"><div class="k">Appeared from nowhere</div><div class="v" id="t_plus">—</div><div class="s" id="t_plus_s"></div></div>
-  <div class="tile"><div class="k">Recorded write-offs</div><div class="v" id="t_off">—</div><div class="s" id="t_off_s"></div></div>
+<div class="actions">
+  <button class="btn primary" id="sample">Try the sample business</button>
+  <button class="btn ink" id="go">Count what's missing</button>
+  <span class="sp"></span>
+  <button class="btn" id="dl" disabled>Download the verdicts (CSV)</button>
+  <button class="btn" id="print" disabled>Print / PDF</button>
 </div>
-<section><h2>Worth walking out with</h2>
-<div class="why" id="spotwhy"></div>
-<table><thead><tr><th>SKU</th><th>Item</th><th class="n">Unit cost</th><th class="n">Units missing</th><th class="n">Value</th></tr></thead><tbody id="spotT"></tbody></table></section>
-<section><h2>Every product with a verdict</h2>
-<div class="why" id="skuswhy"></div>
-<table><thead><tr><th>SKU</th><th>Item</th><th class="n">First</th><th class="n">+In</th><th class="n">−Out</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Variance</th><th class="n">Value</th></tr></thead><tbody id="skuT"></tbody></table></section>
-<section><h2>Sold but never counted</h2>
-<div class="why">Movements pointing at a product with no usable count row. The ledger knows this product; the count sheet doesn't. Count it, or stop selling ghosts.</div>
-<table><thead><tr><th>SKU</th><th class="n">Rows</th><th class="n">Units moved</th></tr></thead><tbody id="orphT"></tbody></table></section>
-<section><h2>Rows this page refused or held, with reasons</h2>
-<div class="why">A row that can't be trusted is refused and listed — never silently swallowed. A reference seen twice is held so a delivery can't count double.</div>
-<table><thead><tr><th>File</th><th class="n">Row</th><th>Id / ref</th><th>Reason</th></tr></thead><tbody id="refT"></tbody></table></section>
-<div id="recon"></div>
+<span id="fict">fictional sample data · Wrenfield Hardware &amp; Paint</span>
+<div id="err" role="alert"></div>
+
+<div class="empty fade" id="empty"><div class="mini" aria-hidden="true"><i></i><i></i><i class="m"></i><i></i><i></i><i></i><i></i><i class="m"></i><i></i><i></i><i></i><i></i></div><b>The map is blank until you count</b>Drop in both files, or press “Try the sample business” to see a hardware store's shelves audited on made-up data.</div>
+
+<div id="out" class="hidden">
+  <div class="banner fade" id="banner" role="alert"><span class="tag">Status</span><span class="txt" id="banner_t"></span></div>
+  <div class="banner fade" id="missban" role="alert"><span class="tag">Verdict</span><span class="txt" id="missban_t"></span></div>
+
+  <div id="tiles" class="fade">
+    <div class="tile warn"><div class="k" id="t_head_k">Missing, unexplained</div><div class="v" id="t_head">—</div><div class="s" id="t_head_s"></div></div>
+    <div class="tile acc"><div class="k">Share of what the shelves held</div><div class="v" id="t_pct">—</div><div class="s" id="t_pct_s"></div></div>
+    <div class="tile sig"><div class="k">Appeared from nowhere</div><div class="v" id="t_plus">—</div><div class="s" id="t_plus_s"></div></div>
+    <div class="tile"><div class="k">Recorded write-offs</div><div class="v" id="t_off">—</div><div class="s" id="t_off_s"></div></div>
+  </div>
+
+  <div id="planwrap">
+    <div class="sec"><h2>The store, as counted</h2><span class="why2">one tile per product, grouped by aisle · the number is units missing (−) or appeared (+)</span></div>
+    <div class="plan fade">
+      <div class="legend"><span><s style="background:var(--miss)"></s>missing</span><span><s style="background:var(--plus-bg);outline:1.5px solid var(--plus)"></s>appeared</span><span><s style="outline:1.5px dashed var(--forg)"></s>forgiven noise</span><span><s style="background:var(--clean)"></s>clean</span><span><b style="color:var(--ink)">$</b> = on the spotlight list</span></div>
+      <div class="aisles" id="aisles"></div>
+      <div id="offplan"></div>
+    </div>
+  </div>
+
+  <div class="sec"><h2>Worth walking out with</h2></div>
+  <div class="card fade"><p class="why" id="spotwhy"></p><div class="tbl"><table><thead><tr><th>SKU</th><th>Item</th><th class="n">Unit cost</th><th class="n">Units missing</th><th class="n">Value</th></tr></thead><tbody id="spotT"></tbody></table></div></div>
+
+  <div class="sec"><h2>Every product with a verdict</h2></div>
+  <div class="card fade"><p class="why" id="skuswhy"></p><div class="tbl"><table><thead><tr><th>SKU</th><th>Item</th><th class="n">First</th><th class="n">+In</th><th class="n">−Out</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Variance</th><th class="n">Value</th></tr></thead><tbody id="skuT"></tbody></table></div></div>
+
+  <div class="grid2">
+    <div><div class="sec"><h2>Sold but never counted</h2></div>
+      <div class="card fade"><p class="why">Movements pointing at a product with no usable count row. The ledger knows it; the count sheet doesn't. Count it, or stop selling ghosts.</p><div class="tbl"><table><thead><tr><th>SKU</th><th class="n">Rows</th><th class="n">Units moved</th></tr></thead><tbody id="orphT"></tbody></table></div></div></div>
+    <div><div class="sec"><h2>Rows refused or held</h2></div>
+      <div class="card fade"><p class="why">A row that can't be trusted is refused and listed — never silently swallowed. A reference seen twice is held so a delivery can't count double.</p><div class="tbl"><table><thead><tr><th>File</th><th class="n">Row</th><th>Id / ref</th><th>Reason</th></tr></thead><tbody id="refT"></tbody></table></div></div></div>
+  </div>
+
+  <div class="sec"><h2>Self-audit</h2><span class="why2">run every time</span></div>
+  <div class="card fade"><ul id="recon"></ul></div>
 </div>
-<footer>The Shrinkage Counter · built on "Build It With AI" · one file, no internet, no account. Sample store (Wrenfield Hardware &amp; Paint) is fictional.</footer>
+
+<footer>
+  <div>It reads your files and changes nothing. Most variance has an ordinary explanation — a receiving error, a smashed can nobody logged. A red tile is a question to ask, not an accusation.</div>
+  <div>The sample store (Wrenfield Hardware &amp; Paint) and every name and number in it are fictional. Not legal or accounting advice.</div>
+  <div>Made on <a href="https://www.youtube.com/@jonathangatz" target="_blank" rel="noopener">Build It With AI</a> · <a href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">all the free tools</a></div>
+</footer>
+</div>
 <script>// The Shrinkage Counter — final engine (Episode 41). All money in integer cents; all units in
 // integer units; every division through halfUpDiv so two implementations cannot drift.
 // window.SC.audit(countsCsv, movementsCsv, settings) -> report object.
@@ -317,23 +510,48 @@ const $=id=>document.getElementById(id);
 const money=c=>(c<0?"-$":"$")+Math.abs(c/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const pctT=t=>Math.floor(t/10)+"."+(t%10)+"%";
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+const AISLE={EL:"Electrical",FA:"Fasteners",GD:"Garden",HW:"Hardware",PL:"Plumbing",PT:"Paint",SP:"Big-ticket",GL:"Glass"};
 let LAST=null;
 function settings(){
   return {forgiveUnits:+$("s_forgive").value, spotlightCents:+$("s_spot").value, lens:$("s_lens").value};
 }
+function showErr(msg){const e=$("err");if(!msg){e.style.display="none";e.textContent="";return;}e.textContent=msg;e.style.display="block";}
+function jump(){if(window.innerWidth<900){const o=$("out");if(o&&o.scrollIntoView)o.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});}}
+function drawPlan(R){
+  const spot=new Set(R.spotlight.map(s=>s.sku));
+  const groups=new Map();
+  for(const l of R.skus){
+    const p=(String(l.sku).split("-")[0]||"?").toUpperCase();
+    if(!groups.has(p))groups.set(p,[]);
+    groups.get(p).push(l);
+  }
+  const keys=[...groups.keys()].sort();
+  $("aisles").innerHTML=keys.map((k,i)=>{
+    const items=groups.get(k).slice().sort((a,b)=>a.sku<b.sku?-1:a.sku>b.sku?1:0);
+    const miss=items.filter(l=>l.class==="MISSING").reduce((s,l)=>s-l.variance,0);
+    return `<div class="aisle"><h4>Aisle ${i+1} · ${esc(AISLE[k]||k)}${miss?`<span>−${miss} units</span>`:""}</h4><div class="shelf">${items.map(l=>{
+      const d=l.variance===0?"":(l.variance>0?"+":"−")+Math.abs(l.variance);
+      const lvl=l.class==="MISSING"&&-l.variance<=2?" l1":"";
+      return `<div class="prod ${l.class}${lvl}${spot.has(l.sku)?" spot":""}" title="${esc(l.sku+" · "+l.item+" · "+l.class.toLowerCase()+(d?" "+d:""))}"><span class="sku">${esc(l.sku)}</span><span class="d">${d}</span></div>`;}).join("")}</div></div>`;
+  }).join("");
+  $("offplan").innerHTML=R.orphans.length?`<div class="offplan"><b>Off the plan:</b> sold but never counted ${R.orphans.map(o=>`<div class="prod" title="${esc(o.sku)} · ${o.units} units moved, no count row"><span class="sku">${esc(o.sku)}</span><span class="d">?</span></div>`).join("")}</div>`:"";
+}
 function run(){
+  showErr("");
   const c=$("ccsv").value,m=$("mcsv").value;
-  if(!c.trim()||!m.trim()){alert("Paste both files (or load the sample store).");return;}
+  if(!c.trim()||!m.trim()){showErr("Load both files (or press “Try the sample business”).");return;}
   let R;
-  try{R=window.SC.audit(c,m,settings());}catch(e){alert(e.message);return;}
+  try{R=window.SC.audit(c,m,settings());}catch(e){showErr(e.message);return;}
   LAST=R;
-  $("out").style.display="block";
+  $("empty").classList.add("hidden");$("out").classList.remove("hidden");
+  $("dl").disabled=$("print").disabled=false;
   const b=$("banner"),mb=$("missban");
-  if(!R.recon.trusted){b.style.display="block";b.textContent=R.recon.banner;}
+  if(!R.recon.trusted){b.style.display="block";$("banner_t").textContent=R.recon.banner;}
   else b.style.display="none";
-  if(R.recon.missBanner){mb.style.display="block";mb.textContent=R.recon.missBanner;}
+  if(R.recon.missBanner){mb.style.display="block";$("missban_t").textContent=R.recon.missBanner;}
   else mb.style.display="none";
   const withheld=!R.recon.trusted;
+  $("planwrap").style.display=withheld?"none":"";
   $("t_head_k").textContent=R.settings.lens==="all"?"Missing + recorded write-offs":"Missing, unexplained";
   $("t_head").textContent=withheld?"—":money(R.money.headlineValue);
   $("t_head_s").textContent=withheld?"findings withheld — see the audit panel":R.units.missingUnits+" units across "+R.counts.missingSkus+" products"+(R.settings.lens==="all"?" + "+R.units.recordedLossUnits+" written off":"");
@@ -343,44 +561,61 @@ function run(){
   $("t_plus_s").textContent=withheld?"":money(R.money.surplusValue)+" of surplus — usually a delivery keyed wrong";
   $("t_off").textContent=withheld?"—":money(R.money.recordedLossValue);
   $("t_off_s").textContent=withheld?"":R.units.recordedLossUnits+" units written off on the record — explained, not shrink";
+  if(!withheld)drawPlan(R);
   $("spotwhy").textContent="Missing products with a unit cost of "+money(R.settings.spotlightCents)+" or more — the shortlist a pocket prefers. Forgiveness dial: "+R.settings.forgiveUnits+" unit(s) of count noise per product.";
   $("spotT").innerHTML=withheld?"":R.spotlight.map(s=>
-    `<tr><td>${esc(s.sku)}</td><td>${esc(s.item)}</td><td class="n">${money(s.unitCost)}</td><td class="n">${s.units}</td><td class="n"><b>${money(s.value)}</b></td></tr>`).join("")
+    `<tr><td><code>${esc(s.sku)}</code></td><td class="item">${esc(s.item)}</td><td class="n">${money(s.unitCost)}</td><td class="n">${s.units}</td><td class="n"><b>${money(s.value)}</b></td></tr>`).join("")
     ||`<tr><td colspan="5" class="note">Nothing above this cost line is missing.</td></tr>`;
   $("skuswhy").textContent="Expected = first count + received + returns − sales − write-offs, applied only inside each product's count window. Variance = counted − expected.";
   $("skuT").innerHTML=withheld?"":R.skus.filter(l=>l.class!=="CLEAN").map(l=>{
     const chip=l.class==="MISSING"?'<span class="chip miss">MISSING</span>':l.class==="SURPLUS"?'<span class="chip plus">APPEARED</span>':'<span class="chip forg">forgiven</span>';
     const val=(l.class==="MISSING"?-l.variance:l.class==="SURPLUS"?l.variance:Math.abs(l.variance))*l.unitCost;
     const inn=l.received+l.returns, outn=l.sales+l.writeoffs;
-    return `<tr><td>${esc(l.sku)}</td><td>${esc(l.item)}${chip}${l.writeoffs?'<span class="chip off">'+l.writeoffs+' written off</span>':''}</td><td class="n">${l.first}</td><td class="n">+${inn}</td><td class="n">−${outn}</td><td class="n">${l.expected}</td><td class="n">${l.second}</td><td class="n ${l.variance<0?"delta up":"delta dn"}">${l.variance>0?"+":""}${l.variance}</td><td class="n"><b>${money(val)}</b></td></tr>`;}).join("")
+    return `<tr><td><code>${esc(l.sku)}</code></td><td class="item">${esc(l.item)}${chip}${l.writeoffs?'<span class="chip off">'+l.writeoffs+' written off</span>':''}</td><td class="n">${l.first}</td><td class="n">+${inn}</td><td class="n">−${outn}</td><td class="n">${l.expected}</td><td class="n">${l.second}</td><td class="n ${l.variance<0?"delta up":"delta dn"}">${l.variance>0?"+":""}${l.variance}</td><td class="n"><b>${money(val)}</b></td></tr>`;}).join("")
     ||`<tr><td colspan="9" class="note">Every product's count matches its ledger.</td></tr>`;
   $("orphT").innerHTML=withheld?"":R.orphans.map(o=>
-    `<tr><td>${esc(o.sku)}</td><td class="n">${o.rows}</td><td class="n">${o.units}</td></tr>`).join("")
+    `<tr><td><code>${esc(o.sku)}</code></td><td class="n">${o.rows}</td><td class="n">${o.units}</td></tr>`).join("")
     ||`<tr><td colspan="3" class="note">No orphans — every movement found its product.</td></tr>`;
-  const refRows=R.refusedCounts.map(r=>`<tr><td>counts.csv</td><td class="n">${r.line}</td><td>${esc(r.sku)}</td><td>${esc(r.reason)}</td></tr>`)
-    .concat(R.refusedMoves.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td>${esc(r.ref)}</td><td>${esc(r.reason)}</td></tr>`))
-    .concat(R.held.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td>${esc(r.ref)}</td><td>HELD — ${esc(r.reason)}</td></tr>`));
+  const refRows=R.refusedCounts.map(r=>`<tr><td>counts.csv</td><td class="n">${r.line}</td><td><code>${esc(r.sku)}</code></td><td>${esc(r.reason)}</td></tr>`)
+    .concat(R.refusedMoves.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td><code>${esc(r.ref)}</code></td><td>${esc(r.reason)}</td></tr>`))
+    .concat(R.held.map(r=>`<tr><td>movements.csv</td><td class="n">${r.line}</td><td><code>${esc(r.ref)}</code></td><td>HELD — ${esc(r.reason)}</td></tr>`));
   $("refT").innerHTML=refRows.join("")||`<tr><td colspan="4" class="note">Nothing refused.</td></tr>`;
   const rc=R.recon;
+  const li=(lab,eq,ok,yes,no)=>`<li><span class="lab">${lab}</span><span class="eq">${eq}</span><span class="${ok?"ok":"bad"}">${ok?yes:no}</span></li>`;
   $("recon").innerHTML=
-   `self-audit, run every time\n`+
-   `counts     ${R.counts.countRows} rows = ${R.counts.audited} audited + ${R.counts.refusedCounts} refused  <span class="${rc.tie1?"ok":"bad"}">${rc.tie1?"ties":"DOES NOT TIE"}</span>\n`+
-   `movements  ${R.counts.movementRows} rows = ${R.counts.applied} applied + ${R.counts.refusedMoves} refused + ${R.counts.orphanRows} orphaned + ${R.counts.held} held  <span class="${rc.tie2?"ok":"bad"}">${rc.tie2?"ties":"DOES NOT TIE"}</span>\n`+
-   `verdicts   ${R.counts.missingSkus} missing + ${R.counts.surplusSkus} appeared + ${R.counts.forgivenSkus} forgiven + ${R.counts.cleanSkus} clean = ${R.counts.audited}  <span class="${rc.tie3?"ok":"bad"}">${rc.tie3?"ties":"DOES NOT TIE"}</span>\n`+
-   `recount    every variance re-derived by a second pass, compared  <span class="${rc.tie4?"ok":"bad"}">${rc.tie4?"matches":"DISAGREES"}</span>\n`+
-   `refused    ${pctT(rc.refusedShare_tenths)} of movement rows  <span class="${rc.refusedShare_tenths<=100?"ok":"bad"}">${rc.refusedShare_tenths<=100?"within tolerance":"over 10% — do not trust"}</span>`;
+    li("counts",`${R.counts.countRows} rows = ${R.counts.audited} audited + ${R.counts.refusedCounts} refused`,rc.tie1,"ties","DOES NOT TIE")+
+    li("movements",`${R.counts.movementRows} rows = ${R.counts.applied} applied + ${R.counts.refusedMoves} refused + ${R.counts.orphanRows} orphaned + ${R.counts.held} held`,rc.tie2,"ties","DOES NOT TIE")+
+    li("verdicts",`${R.counts.missingSkus} missing + ${R.counts.surplusSkus} appeared + ${R.counts.forgivenSkus} forgiven + ${R.counts.cleanSkus} clean = ${R.counts.audited}`,rc.tie3,"ties","DOES NOT TIE")+
+    li("recount","every variance re-derived by a second pass, compared",rc.tie4,"matches","DISAGREES")+
+    li("refused",`${pctT(rc.refusedShare_tenths)} of movement rows`,rc.refusedShare_tenths<=100,"within tolerance","over 10% — do not trust");
   window.__done=true;
 }
-$("sample").addEventListener("click",()=>{$("ccsv").value=SAMPLE_C;$("mcsv").value=SAMPLE_M;$("fict").style.display="inline-block";window.__done=false;run();});
-$("go").addEventListener("click",()=>{window.__done=false;run();});
+function loaded(which,name,text){
+  $(which==="c"?"statec":"statem").textContent="✓ "+name+" · "+Math.max(0,text.trim().split(/\r?\n/).length-1)+" rows";
+  $(which==="c"?"dropc":"dropm").classList.add("loaded");
+}
+function hook(input,drop,which){
+  const read=f=>{const rd=new FileReader();rd.onload=()=>{$(which==="c"?"ccsv":"mcsv").value=rd.result;loaded(which,f.name,rd.result);
+    if($("ccsv").value.trim()&&$("mcsv").value.trim()){window.__done=false;run();jump();}};rd.readAsText(f);};
+  $(input).addEventListener("change",e=>{const f=e.target.files[0];if(f)read(f)});
+  ["dragenter","dragover"].forEach(ev=>$(drop).addEventListener(ev,e=>{e.preventDefault();$(drop).classList.add("over")}));
+  ["dragleave","drop"].forEach(ev=>$(drop).addEventListener(ev,e=>{e.preventDefault();$(drop).classList.remove("over")}));
+  $(drop).addEventListener("drop",e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)read(f)});
+}
+hook("fc","dropc","c");hook("fm","dropm","m");
+$("sample").addEventListener("click",()=>{$("ccsv").value=SAMPLE_C;$("mcsv").value=SAMPLE_M;loaded("c","wrenfield-counts.csv",SAMPLE_C);loaded("m","wrenfield-movements.csv",SAMPLE_M);$("fict").style.display="inline-block";window.__done=false;run();jump();});
+$("go").addEventListener("click",()=>{window.__done=false;run();jump();});
 for(const id of ["s_forgive","s_spot","s_lens"]) $(id).addEventListener("change",()=>{if(LAST){window.__done=false;run();}});
 $("dl").addEventListener("click",()=>{
-  if(!LAST){alert("Count first.");return;}
+  if(!LAST){showErr("Count first.");return;}
   const rows=[["SKU","Item","Unit cost","First","Received","Returns","Sales","Writeoffs","Expected","Counted","Variance","Verdict"]].concat(
     LAST.skus.map(l=>[l.sku,l.item,(l.unitCost/100).toFixed(2),l.first,l.received,l.returns,l.sales,l.writeoffs,l.expected,l.second,l.variance,l.class]));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
   const b=new Blob([csv],{type:"text/csv"});const u=URL.createObjectURL(b);
-  const a=document.createElement("a");a.href=u;a.download="shrinkage_verdicts.csv";a.click();URL.revokeObjectURL(u);
+  const a=document.createElement("a");a.href=u;a.download="shrinkage_verdicts.csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
 });
+$("print").addEventListener("click",()=>window.print());
+$("theme").addEventListener("click",()=>{const d=document.documentElement;
+  d.dataset.theme=(d.dataset.theme==="dark"||(!d.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches))?"light":"dark";});
 window.__loaded=true;
 </script></body></html>
